@@ -17,6 +17,13 @@ public class SSHTunnel implements ISSHTunnel{
     private Session session;
 
 
+    /**
+     * Constructor
+     * @param _ip
+     * @param _sshPort
+     * @param _remotePort
+     * @param _localPort
+     */
     public SSHTunnel(InetAddress _ip, int _sshPort, int _remotePort, int _localPort){
         this.ip = _ip;
         this.sshPort = _sshPort;
@@ -24,6 +31,11 @@ public class SSHTunnel implements ISSHTunnel{
         this.localPort = _localPort;
     }
 
+    /**
+     * Constructor
+     * @param _ip
+     * @param _sshPort
+     */
     public SSHTunnel(InetAddress _ip, int _sshPort){
         this.ip = _ip;
         this.sshPort = _sshPort;
@@ -38,7 +50,7 @@ public class SSHTunnel implements ISSHTunnel{
             if(portForward) this.session.setPortForwardingL(this.localPort, this.ip.toString()  , this.remotePort);
 
         }catch (Exception ex){
-            //throw ex;
+            System.err.println(ex);
         }
     }
 
@@ -48,6 +60,11 @@ public class SSHTunnel implements ISSHTunnel{
             this.session.disconnect();
         }catch (Exception ex){
             this.session = null;
+            System.err.println(ex);
         }
+    }
+
+    public Boolean isConnected(){
+        return  this.session.isConnected();
     }
 }
