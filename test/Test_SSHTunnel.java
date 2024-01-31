@@ -68,10 +68,7 @@ public class Test_SSHTunnel implements IObserverListener {
 
 
             waiter.await(2000, TimeUnit.MILLISECONDS);
-
-            //Assertions.assertTimeout(Duration.ofMillis(10000), () ->{
-                assertEquals(true, this.sendSuccess);
-            //});
+            assertEquals(true, this.sendSuccess);
 
         }catch (Exception ex){
             System.err.println(ex);

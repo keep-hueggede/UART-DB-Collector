@@ -35,5 +35,6 @@
         <SOURCES />
       </library>
     </orderEntry>
+    <orderEntry type="library" name="fazecast.jSerialComm" level="project" />
   </component>
 </module>
