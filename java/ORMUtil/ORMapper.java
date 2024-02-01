@@ -40,6 +40,8 @@ public class ORMapper extends CommonDbConnector {
         settings.put(Environment.PASS, this.password);
         settings.put(Environment.CURRENT_SESSION_CONTEXT_CLASS, "thread");
         settings.put(Environment.HBM2DDL_AUTO, "create-drop");
+        settings.put(Environment.SHOW_SQL, false);
+        settings.put(Environment.LOG_JDBC_WARNINGS, false);
 
         conf.setProperties(settings);
 

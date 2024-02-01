@@ -23,6 +23,8 @@ public class Test_UARTCom implements IObserverListener {
         try{
             this.prop = new Properties();
             this.prop.load(new FileInputStream(this.configFile));
+
+            this.com = new UARTCom(prop.getProperty("UART.PORTNAME"));
         }catch (Exception ex){
             System.err.println(ex);
             ex.printStackTrace();
@@ -31,7 +33,7 @@ public class Test_UARTCom implements IObserverListener {
     @Test
     public void TestConnection(){
         try {
-            this.com = new UARTCom(prop.getProperty("UART.PORTNAME"));
+
             this.com.open();
 
             assertEquals(true, this.com.isConnected());
