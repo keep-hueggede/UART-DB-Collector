@@ -9,25 +9,7 @@ import java.util.*;
 
 public class Controller implements IObserverListener {
 
-    class comStruct {
-        private Integer datapointID;
-        private String id;
-        private String key;
-        private String sensorType;
-        private Double dValue;
-        private  String sValue;
-        Boolean type;
 
-        public comStruct(Integer _datapointID, String _id, String _key, String _sensorType, Double _dValue, String _sValue, Boolean _type) {
-            this.datapointID = _datapointID;
-            this.id = _id;
-            this.key =_key;
-            this.sensorType = _sensorType;
-            this.dValue = _dValue;
-            this.sValue = _sValue;
-            this.type = _type;
-        }
-    }
     private UARTCom com;
     private ORMapper mapper;
     private DataPoint dp;
@@ -43,6 +25,8 @@ public class Controller implements IObserverListener {
             this.com = new UARTCom(prop.getProperty("UART.PORTNAME"));
             this.mapper = new ORMapper(prop.getProperty("MYSQL.HOST"), Integer.parseInt(prop.getProperty("MYSQL.PORT")), prop.getProperty("MYSQL.DATABASE"), prop.getProperty("MYSQL.USER"), prop.getProperty("MYSQL.PASSWORD"), List.of(DataPoint.class));
 
+            //register subscriber
+            this.com.addListener(this);
 
 
         }catch (Exception ex) {
@@ -51,13 +35,15 @@ public class Controller implements IObserverListener {
             }
     }
 
-    protected comStruct mapUARTData(String data){
+    protected ComStruct mapUARTData(String data){
+        System.out.println(data);
         return null;//new comStruct();
     }
 
     @Override
     public void onSignaled(String answer) {
         if(Objects.isNull(this.dp)) this.dp = new DataPoint();
+        mapUARTData(answer);
 
     }
 }
