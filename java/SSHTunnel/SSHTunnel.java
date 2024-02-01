@@ -126,7 +126,7 @@ public class SSHTunnel extends Observer implements IListenerInterface {
             }
         });
     }
-
+    @Override
     public Boolean isConnected() {
         return this.session.isConnected();
     }
