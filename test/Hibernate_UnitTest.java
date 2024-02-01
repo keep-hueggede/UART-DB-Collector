@@ -8,7 +8,7 @@ public class Hibernate_UnitTest {
     @Column(name = "Id")
     private int id;
 
-    @Column(name = "Key")
+    @Column(name = "_Key")
     private String key;
 
     @Column(name = "Val")

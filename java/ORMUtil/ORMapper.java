@@ -61,7 +61,6 @@ public class ORMapper extends CommonDbConnector {
 
     public void disconnect(){
         this.session.close();
-        this.session = null;
     }
 
     public void persist(Object ent){

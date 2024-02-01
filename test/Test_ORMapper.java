@@ -50,12 +50,12 @@ public class Test_ORMapper {
             this.orMapper.persist(item);
         }
 
-        List<Hibernate_UnitTest> res =  this.orMapper.get("for UnitTest", Hibernate_UnitTest.class).stream().map( e -> (Hibernate_UnitTest)e).toList();
+        List<Hibernate_UnitTest> res =  this.orMapper.get("from Hibernate_UnitTest", Hibernate_UnitTest.class).stream().map( e -> (Hibernate_UnitTest)e).toList();
         assertEquals(100, res.size());
 
         for (int i =1; i<=100; i++){
             Integer sum = i*i;
-            assertEquals(sum, res.get(i).getVal());
+            assertEquals(sum, res.get(i-1).getVal());
         }
 
     }
