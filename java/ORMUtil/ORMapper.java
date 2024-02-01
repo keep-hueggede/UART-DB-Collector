@@ -64,18 +64,22 @@ public class ORMapper extends CommonDbConnector {
         this.session = null;
     }
 
-    public void persist(Entity ent){
+    public void persist(Object ent){
         Transaction transaction = this.session.beginTransaction();
         this.session.persist(ent);
         transaction.commit();
     }
 
-    public List<Entity> get(String query, Class ent){
+    public List<Object> get(String query, Class ent){
         return this.session.createQuery(query,ent).list();
     }
 
     @Override
     protected String buildConnectionString(Boolean toDatabase) {
         return "jdbc:mysql://" + this.host + ":" + this.port + (toDatabase ? "/" + this.database : "");
+    }
+
+    public Boolean isConnected(){
+        return this.session.isConnected();
     }
 }

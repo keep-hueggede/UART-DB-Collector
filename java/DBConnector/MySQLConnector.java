@@ -33,8 +33,6 @@ public class MySQLConnector extends CommonDbConnector  implements IDatabase {
         } catch (Exception ex) {
             System.err.println(ex);
             ex.printStackTrace();
-        }finally {
-            this.con = null;
         }
     }
 

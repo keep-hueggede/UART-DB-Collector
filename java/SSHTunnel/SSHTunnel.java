@@ -6,7 +6,7 @@ import java.net.InetAddress;
 
 import Listener.IListenerInterface;
 import Listener.Observer;
-import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.*;
 import com.jcraft.jsch.JSch;
 import com.jcraft.jsch.Session;
 
@@ -23,7 +23,7 @@ public class SSHTunnel extends Observer implements IListenerInterface {
     private String pathToKnownHosts;
 
     private Session session;
-    private ChannelExec channel;
+    private Channel channel;
 
 
     /**
@@ -69,9 +69,12 @@ public class SSHTunnel extends Observer implements IListenerInterface {
             this.session = jsch.getSession(userName, this.ip.getHostAddress(), this.sshPort);
             this.session.setPassword(password);
             this.session.connect();
-            if (portForward) this.session.setPortForwardingL(this.localPort, this.ip.getHostAddress(), this.remotePort);
-            this.channel = (ChannelExec) session.openChannel("exec");
-            channel.connect();
+            if (portForward) {
+                this.session.setPortForwardingL(this.localPort, this.ip.getHostAddress(), this.remotePort);
+            }
+            this.channel = session.openChannel("exec");
+            //channel.connect();
+
 
         } catch (Exception ex) {
             System.err.println(ex);
@@ -95,8 +98,8 @@ public class SSHTunnel extends Observer implements IListenerInterface {
     public void Send(String input) {
 
         try {
-            channel.setCommand(input);
-
+            ((ChannelExec) channel).setCommand(input);
+            this.channel.connect();
         } catch (Exception ex) {
             System.err.println(ex);
             ex.printStackTrace();
@@ -106,26 +109,31 @@ public class SSHTunnel extends Observer implements IListenerInterface {
 
     @Override
     public void Listen() {
-        StringBuilder outBuffer = new StringBuilder();
         Thread.ofPlatform().start(() -> {
-            try{
-            InputStream output = this.channel.getInputStream();
-            int readByte = output.read();
+        try {
+            StringBuilder outBuffer = new StringBuilder();
+            InputStream input = this.channel.getInputStream();
+            while (true) {
+               int readByte = input.read();
 
-            while(true){
-                while (readByte != 0xffffffff) {
-                    outBuffer.append((char) readByte);
-                    readByte = output.read();
-                }
+               if (readByte > -1) {
+                   outBuffer.append((char) readByte);
+               }else {
+                   this.fireSignal(outBuffer.toString());
+                   outBuffer = new StringBuilder();
+               }
+            }
 
-                this.fireSignal(outBuffer.toString());
-            }
-            } catch (Exception ex) {
-                System.err.println(ex);
-                ex.printStackTrace();
-            }
+
+            //this.channel.disconnect();
+
+        } catch (Exception ex) {
+            System.err.println(ex);
+            ex.printStackTrace();
+        }
         });
     }
+
     @Override
     public Boolean isConnected() {
         return this.session.isConnected();

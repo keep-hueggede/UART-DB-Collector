@@ -25,7 +25,7 @@ public class Test_MySQLConnector {
             this.prop = new Properties();
             this.prop.load(new FileInputStream(this.configFile));
 
-            this.mysqlCon = new MySQLConnector(prop.getProperty("MYSQL.HOST"),Integer.parseInt(prop.getProperty("MYSQL.PORT")), "", prop.getProperty("MYSQL.USER"), prop.getProperty("MYSQL.PASSWORD") );
+            this.mysqlCon = new MySQLConnector(prop.getProperty("MYSQL.HOST"),Integer.parseInt(prop.getProperty("MYSQL.PORT")), prop.getProperty("MYSQL.DATABASE"), prop.getProperty("MYSQL.USER"), prop.getProperty("MYSQL.PASSWORD") );
         } catch (Exception ex) {
             System.err.println(ex);
             ex.printStackTrace();
@@ -34,14 +34,15 @@ public class Test_MySQLConnector {
 
 //    @Before
 //    public void buildUpSSH(){
-//        try{
-//        this.sshTunnel = new SSHTunnel(InetAddress.getByName(prop.getProperty("SERVER.IP")), Integer.parseInt(prop.getProperty("SERVER.PORT")), prop.getProperty("SSH.KNOWNHOSTS"), Integer.parseInt(prop.getProperty("SSH.LOCALPORT")), Integer.parseInt(prop.getProperty("SSH.REMOTEPORT")),prop.getProperty("SSH.USER"), prop.getProperty("SSH.PW"));
-//        this.sshTunnel.open();
-//
-//        } catch (Exception ex) {
-//            System.err.println(ex);
-//            ex.printStackTrace();
-//        }
+//        Thread.ofPlatform().start(() -> {
+//            try {
+//                this.sshTunnel = new SSHTunnel(InetAddress.getByName(prop.getProperty("SERVER.IP")), Integer.parseInt(prop.getProperty("SERVER.PORT")), prop.getProperty("SSH.KNOWNHOSTS"), Integer.parseInt(prop.getProperty("SSH.LOCALPORT")), Integer.parseInt(prop.getProperty("SSH.REMOTEPORT")), prop.getProperty("SSH.USER"), prop.getProperty("SSH.PW"));
+//                this.sshTunnel.open();
+//            } catch (Exception ex) {
+//                System.err.println(ex);
+//                ex.printStackTrace();
+//            }
+//        });
 //    }
 //
 //    @After
@@ -75,16 +76,17 @@ public class Test_MySQLConnector {
         this.mysqlCon.connect();
         assertEquals(true, this.mysqlCon.isConnected());
 
-        this.mysqlCon.execute("CREATE DATABASE " + prop.getProperty("MYSQL.DATABASE")+";");
-        this.mysqlCon.execute("CREATE TABLE tblUnitTest (ID int NOT NULL AUTO_INCREMENT, Key varchar(50), Val int, PRIMARY KEY (ID));");
+        //this.mysqlCon.execute("CREATE DATABASE " + prop.getProperty("MYSQL.DATABASE")+";");
+        this.mysqlCon.execute("CREATE TABLE tblUnitTest (ID int NOT NULL AUTO_INCREMENT, _Key varchar(50), Val int, PRIMARY KEY (ID));");
 
         for (int i =0; i<100; i++){
-            this.mysqlCon.transaction("INSERT INTO tblUnitTest (Key, Val) VALUES ('Counter', "+ i * i +" );");
+            this.mysqlCon.transaction("INSERT INTO tblUnitTest (_Key, Val) VALUES ('Counter', "+ i * i +" );");
         }
 
         ResultSet res = this.mysqlCon.query("SELECT SUM(Val) AS KeySum FROM tblUnitTest;");
 
         assertEquals(1, res.findColumn("KeySum"));
+            this.mysqlCon.execute("DROP TABLE tblUnitTest;");
         this.mysqlCon.disconnect();
         assertEquals(false, this.mysqlCon.isConnected());
         } catch (Exception ex) {
