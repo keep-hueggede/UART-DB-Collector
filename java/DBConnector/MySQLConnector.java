@@ -5,7 +5,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
 
-public class MySQLConnector extends CommonDbConnector {
+public class MySQLConnector extends CommonDbConnector  implements IDatabase {
     public MySQLConnector(String _host, Integer _port, String _database, String _user, String _password) {
         super(_host, _port, _database, _user, _password);
     }
@@ -33,6 +33,8 @@ public class MySQLConnector extends CommonDbConnector {
         } catch (Exception ex) {
             System.err.println(ex);
             ex.printStackTrace();
+        }finally {
+            this.con = null;
         }
     }
 

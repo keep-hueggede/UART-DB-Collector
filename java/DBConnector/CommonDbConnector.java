@@ -2,7 +2,7 @@ package DBConnector;
 
 import java.sql.Connection;
 
-public abstract class CommonDbConnector implements IDatabase{
+public abstract class CommonDbConnector{
 
     protected String host;
     protected Integer port;
