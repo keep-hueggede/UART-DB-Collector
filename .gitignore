@@ -25,3 +25,4 @@ replay_pid*
 test/app.config
 out/
 java/Controller/app.config
+.idea/
