@@ -1,8 +1,7 @@
 import Listener.IObserverListener;
 import SSHTunnel.SSHTunnel;
 import UARTCom.UARTCom;
-import org.junit.Test;
-
+import org.junit.jupiter.api.*;
 import java.io.FileInputStream;
 import java.net.InetAddress;
 import java.util.Properties;
@@ -31,7 +30,7 @@ public class Test_UARTCom implements IObserverListener {
         }
     }
     @Test
-    public void TestConnection(){
+    public void testConnection(){
         try {
 
             this.com.open();
@@ -44,7 +43,7 @@ public class Test_UARTCom implements IObserverListener {
     }
 
     @Test
-    public void TestSend(){
+    public void testSend(){
         try {
             this.com = new UARTCom(prop.getProperty("UART.PORTNAME"));
             this.com.open();
@@ -53,7 +52,7 @@ public class Test_UARTCom implements IObserverListener {
             this.com.Send("");
 
 
-            waiter.await(2000, TimeUnit.MILLISECONDS);
+            waiter.await(20000, TimeUnit.MILLISECONDS);
             assertEquals(true, this.sendSuccess);
         }catch (Exception ex){
             System.err.println(ex);

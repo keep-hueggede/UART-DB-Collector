@@ -3,12 +3,11 @@ package SSHTunnel;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.net.InetAddress;
+import java.util.concurrent.Executors;
 
 import Listener.IListenerInterface;
 import Listener.Observer;
 import com.jcraft.jsch.*;
-import com.jcraft.jsch.JSch;
-import com.jcraft.jsch.Session;
 
 public class SSHTunnel extends Observer implements IListenerInterface {
 
@@ -109,7 +108,7 @@ public class SSHTunnel extends Observer implements IListenerInterface {
 
     @Override
     public void Listen() {
-        Thread.ofPlatform().start(() -> {
+        Executors.newSingleThreadExecutor().submit(()->{
         try {
             StringBuilder outBuffer = new StringBuilder();
             InputStream input = this.channel.getInputStream();

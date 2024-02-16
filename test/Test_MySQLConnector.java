@@ -1,18 +1,14 @@
 import DBConnector.MySQLConnector;
 import SSHTunnel.SSHTunnel;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.*;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.FileInputStream;
-import java.net.InetAddress;
 import java.sql.ResultSet;
 import java.util.Properties;
 
-import static org.junit.Assert.assertEquals;
+// import static org.junit.Assert.assertEquals;
 
 public class Test_MySQLConnector {
     Properties prop;

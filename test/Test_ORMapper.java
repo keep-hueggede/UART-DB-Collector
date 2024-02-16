@@ -1,13 +1,14 @@
 import DBConnector.MySQLConnector;
 import ORMUtil.ORMapper;
 import SSHTunnel.SSHTunnel;
-import org.junit.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.FileInputStream;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static org.junit.Assert.assertEquals;
+import org.junit.jupiter.api.*;
 
 public class Test_ORMapper {
     Properties prop;

@@ -5,6 +5,8 @@ import Listener.Observer;
 import com.fazecast.jSerialComm.*;
 
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 public class UARTCom extends Observer implements IListenerInterface {
 
@@ -34,7 +36,8 @@ public class UARTCom extends Observer implements IListenerInterface {
 
     @Override
     public void Listen() {
-        Thread.ofPlatform().start(() -> {
+        // Thread.ofPlatform().start(() -> {
+        Executors.newSingleThreadExecutor().submit(()->{
             this.com.addDataListener(new SerialPortMessageListener() {
                 @Override
                 public byte[] getMessageDelimiter() {
