@@ -10,6 +10,7 @@ import java.util.Properties;
 
 // import static org.junit.Assert.assertEquals;
 
+@Disabled("Benötigt MySQL-Server; wird nach DB-Aufbau auf dem Server aktiviert")
 public class Test_MySQLConnector {
     Properties prop;
     String configFile = "./test/app.config";

@@ -12,6 +12,7 @@ import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
+@Disabled("Benötigt externen SSH-Server; wird nach Server-Aufbau aktiviert")
 public class Test_SSHTunnel implements IObserverListener {
 
     Properties prop;

@@ -10,6 +10,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+@Disabled("Benötigt angeschlossenes UART-Gerät; wird nach Elektronik-Aufbau aktiviert")
 public class Test_UARTCom implements IObserverListener {
 
     Properties prop;

@@ -22,7 +22,17 @@
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 replay_pid*
-test/app.config
-out/
-java/Controller/app.config
+
+# IDE
 .idea/
+out/
+target/
+dependency-reduced-pom.xml
+
+# Config (contains credentials)
+app.config
+test/app.config
+java/Controller/app.config
+
+# H2 Database
+data/
