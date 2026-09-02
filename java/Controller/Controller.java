@@ -1,5 +1,6 @@
 package Controller;
 
+import Model.Actuator;
 import Model.Device;
 import Model.Measurement;
 import Model.Sensor;
@@ -45,7 +46,7 @@ public class Controller implements IObserverListener {
             String dbPass = prop.getProperty("DB.PASSWORD", "");
 
             this.mapper = new ORMapper(dbHost, dbPort, dbName, dbUser, dbPass, dbDriver,
-                    List.of(Device.class, Sensor.class, Measurement.class));
+                    List.of(Device.class, Sensor.class, Measurement.class, Actuator.class));
             this.mapper.connect();
 
             String uartPort = prop.getProperty("UART.PORTNAME", "/dev/serial0");
