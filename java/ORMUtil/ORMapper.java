@@ -30,7 +30,8 @@ public class ORMapper extends CommonDbConnector {
 
         if (_driver != null && _driver.equalsIgnoreCase("h2")) {
             this.driverClass = "org.h2.Driver";
-            this.urlPrefix = "jdbc:h2:file:./data/wetter;MODE=MySQL;AUTO_SERVER=TRUE";
+            String dbFile = (this.database == null || this.database.isEmpty()) ? "wetter" : this.database;
+            this.urlPrefix = "jdbc:h2:file:./data/" + dbFile + ";MODE=MySQL;AUTO_SERVER=TRUE";
         } else {
             this.driverClass = "com.mysql.cj.jdbc.Driver";
             this.urlPrefix = "jdbc:mysql://" + this.host + ":" + this.port
