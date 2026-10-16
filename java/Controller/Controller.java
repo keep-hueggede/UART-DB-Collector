@@ -146,12 +146,16 @@ public class Controller implements IObserverListener {
 
     private void processParsed(String src, java.util.Map<Sensor.SensorType, Double> values) {
         if (values.isEmpty()) return;
-        Device device = getOrCreateDevice(src);
-        for (var e : values.entrySet()) {
-            Sensor sensor = getOrCreateSensor(device, e.getKey());
-            persistMeasurement(sensor, e.getValue());
+        try {
+            Device device = getOrCreateDevice(src);
+            for (var e : values.entrySet()) {
+                Sensor sensor = getOrCreateSensor(device, e.getKey());
+                persistMeasurement(sensor, e.getValue());
+            }
+            System.out.printf("OK  %-10s  %d Messwerte gespeichert%n", src, values.size());
+        } finally {
+            this.mapper.clear();
         }
-        System.out.printf("OK  %-10s  %d Messwerte gespeichert%n", src, values.size());
     }
 
     @Override

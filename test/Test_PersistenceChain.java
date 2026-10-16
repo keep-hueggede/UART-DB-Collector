@@ -31,6 +31,17 @@ public class Test_PersistenceChain {
     }
 
     @Test
+    public void sessionUsableAfterFailedPersist() {
+        // Measurement without sensor violates the NOT NULL foreign key
+        assertThrows(RuntimeException.class, () -> mapper.persist(new Measurement(null, 1.0)));
+
+        Device device = new Device("after-error", Device.DeviceType.SENSOR, "test");
+        mapper.persist(device);
+        mapper.clear();
+        assertNotNull(mapper.findByName(Device.class, "after-error"));
+    }
+
+    @Test
     public void weatherDataToDatabase() {
         // Device wetter1 anlegen
         Device device = mapper.findByName(Device.class, "wetter1");

@@ -69,15 +69,32 @@ public class ORMapper extends CommonDbConnector {
     }
 
     public void persist(Object ent) {
-        Transaction transaction = this.session.beginTransaction();
-        this.session.persist(ent);
-        transaction.commit();
+        inTransaction(() -> this.session.persist(ent));
     }
 
     public void merge(Object ent) {
-        Transaction transaction = this.session.beginTransaction();
-        this.session.merge(ent);
-        transaction.commit();
+        inTransaction(() -> this.session.merge(ent));
+    }
+
+    // Roll back on failure, otherwise the long-lived session stays unusable.
+    private void inTransaction(Runnable work) {
+        Transaction tx = this.session.beginTransaction();
+        try {
+            work.run();
+            tx.commit();
+        } catch (RuntimeException ex) {
+            if (tx.isActive()) tx.rollback();
+            this.session.clear();
+            throw ex;
+        }
+    }
+
+    /**
+     * Detach all cached entities. Call after each processed batch so the
+     * first-level cache does not grow with every stored measurement.
+     */
+    public void clear() {
+        this.session.clear();
     }
 
     public <T> T get(Class<T> type, int id) {
