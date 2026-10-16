@@ -34,6 +34,16 @@ public class Test_PayloadParsing {
     }
 
     @Test
+    public void sensorNodeFormatIncludesAltitude() throws Exception {
+        String line = "{\"src\":\"wetter1\",\"temp\":20.92,\"pressure\":982.57,\"altitude\":258.59,\"humidity\":41.80,\"wind\":0.01,\"rain\":0.00}";
+        Controller.ParsedData p = Controller.parseLine(om.readTree(line));
+
+        assertEquals("wetter1", p.src);
+        assertEquals(6, p.values.size());
+        assertEquals(258.59, p.values.get(Sensor.SensorType.ALTITUDE));
+    }
+
+    @Test
     public void missingFieldsAreSkipped() throws Exception {
         String line = "{\"src\":\"wald2\",\"rain\":1.35}";
         Controller.ParsedData p = Controller.parseLine(om.readTree(line));

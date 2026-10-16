@@ -117,13 +117,14 @@ public class Controller implements IObserverListener {
         JsonNode data = root.has("data") ? root.get("data") : root;
 
         java.util.Map<Sensor.SensorType, Double> values = new java.util.HashMap<>();
-        String[] fields = {"temp", "pressure", "humidity", "wind", "rain"};
+        String[] fields = {"temp", "pressure", "humidity", "wind", "rain", "altitude"};
         Sensor.SensorType[] types = {
             Sensor.SensorType.TEMPERATURE,
             Sensor.SensorType.PRESSURE,
             Sensor.SensorType.HUMIDITY,
             Sensor.SensorType.WIND,
-            Sensor.SensorType.RAIN
+            Sensor.SensorType.RAIN,
+            Sensor.SensorType.ALTITUDE
         };
         for (int i = 0; i < fields.length; i++) {
             JsonNode val = data.get(fields[i]);
