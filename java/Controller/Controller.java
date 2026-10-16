@@ -60,8 +60,8 @@ public class Controller implements IObserverListener {
             System.out.println("DB:   " + dbDriver + " -> " + dbHost + ":" + dbPort + "/" + dbName);
 
         } catch (Exception ex) {
-            System.err.println(ex);
-            ex.printStackTrace();
+            // Fail fast instead of running half-initialised (NPE later on)
+            throw new IllegalStateException("UART-DB-Collector startup failed: " + ex.getMessage(), ex);
         }
     }
 

@@ -29,7 +29,10 @@ public class UARTCom extends Observer implements IListenerInterface {
         this.com.setNumDataBits(8);
         this.com.setNumStopBits(SerialPort.ONE_STOP_BIT);
         this.com.setParity(SerialPort.NO_PARITY);
-        this.com.openPort();
+        if (!this.com.openPort()) {
+            throw new IllegalStateException("Cannot open serial port " + this.portDescriptor
+                    + " (missing, busy or no permission; is the serial console disabled?)");
+        }
     }
 
     @Override
