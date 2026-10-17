@@ -1,0 +1,31 @@
+# UART-DB-Collector Konfiguration
+# Kopieren nach ./app.config und anpassen.
+
+# === UART (ESP-C6 ThreadReceiver -> Pi) ===
+UART.PORTNAME=/dev/serial0
+UART.BAUD=115200
+
+# === Datenbank (lokal, wechselbar zu MySQL via SSH-Tunnel) ===
+DB.DRIVER=h2
+DB.HOST=localhost
+DB.PORT=3306
+DB.NAME=wetter
+DB.USER=sa
+DB.PASSWORD=
+
+# === Web-Server / Phone-App ===
+# Bindet standardmaessig auf alle Interfaces -> im LAN vom Phone erreichbar.
+SERVER.ENABLED=true
+SERVER.HOST=0.0.0.0
+SERVER.PORT=8080
+# Statische App-Dateien; fallback ist das mitgelieferte web/ im jar.
+SERVER.WEBROOT=./web
+
+# === SSH-Tunnel (aktivieren wenn Remote-DB existiert) ===
+SSH.HOST=
+SSH.PORT=22
+SSH.USER=
+SSH.PASSWORD=
+SSH.REMOTE_HOST=localhost
+SSH.REMOTE_PORT=3306
+SSH.LOCAL_PORT=3307
