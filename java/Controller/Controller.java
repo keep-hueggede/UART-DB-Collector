@@ -7,6 +7,8 @@ import Model.Sensor;
 import Listener.IObserverListener;
 import ORMUtil.ORMapper;
 import UARTCom.UARTCom;
+import WebServer.DbReader;
+import WebServer.WebServer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -21,6 +23,7 @@ public class Controller implements IObserverListener {
 
     private UARTCom com;
     private ORMapper mapper;
+    private WebServer webServer;
     private final ObjectMapper jsonMapper = new ObjectMapper();
 
     Properties prop;
@@ -55,9 +58,21 @@ public class Controller implements IObserverListener {
             this.com.open();
             this.com.addListener(this);
 
+            boolean serverEnabled = Boolean.parseBoolean(prop.getProperty("SERVER.ENABLED", "true"));
+            if (serverEnabled) {
+                String serverHost = prop.getProperty("SERVER.HOST", "0.0.0.0");
+                int serverPort = Integer.parseInt(prop.getProperty("SERVER.PORT", "8080"));
+                String webRoot = prop.getProperty("SERVER.WEBROOT", "./web");
+                this.webServer = new WebServer(new DbReader(this.mapper), serverHost, serverPort, webRoot);
+                this.webServer.start();
+            }
+
             System.out.println("UART-DB-Collector gestartet.");
             System.out.println("UART: " + uartPort + " @ " + uartBaud + " baud");
             System.out.println("DB:   " + dbDriver + " -> " + dbHost + ":" + dbPort + "/" + dbName);
+            if (this.webServer != null) {
+                System.out.println("Web:  http://localhost:" + this.webServer.getPort() + "/");
+            }
 
         } catch (Exception ex) {
             // Fail fast instead of running half-initialised (NPE later on)
@@ -71,6 +86,7 @@ public class Controller implements IObserverListener {
     }
 
     public void shutdown() {
+        if (this.webServer != null) this.webServer.stop();
         this.com.close();
         this.mapper.disconnect();
         System.out.println("UART-DB-Collector beendet.");
