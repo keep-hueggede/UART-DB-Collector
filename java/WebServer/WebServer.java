@@ -54,6 +54,9 @@ public class WebServer {
     }
 
     public void start() throws IOException {
+        // Drop stalled connections (defaults are unlimited); read once by the JDK on first use
+        System.setProperty("sun.net.httpserver.maxReqTime", System.getProperty("sun.net.httpserver.maxReqTime", "30"));
+        System.setProperty("sun.net.httpserver.maxRspTime", System.getProperty("sun.net.httpserver.maxRspTime", "60"));
         this.server = HttpServer.create(new InetSocketAddress(this.host, this.port), 0);
         this.server.createContext("/api/", this::handleApi);
         this.server.createContext("/", this::handleStatic);
@@ -119,8 +122,9 @@ public class WebServer {
         } catch (IllegalArgumentException ex2) {
             sendError(ex, 400, ex2.getMessage());
         } catch (Exception ex2) {
+            // Details go to the log only, not to the client
             ex2.printStackTrace();
-            sendError(ex, 500, "internal error: " + ex2.getMessage());
+            sendError(ex, 500, "internal error");
         }
     }
 
@@ -169,7 +173,16 @@ public class WebServer {
                 ? "no-cache" : "max-age=3600";
         ex.getResponseHeaders().set("Content-Type", mime);
         ex.getResponseHeaders().set("Cache-Control", cache);
+        // connect-src stays open: the settings dialog may point the app at another collector
+        ex.getResponseHeaders().set("Content-Security-Policy",
+                "default-src 'self'; img-src 'self' data:; connect-src *; object-src 'none'; "
+                        + "base-uri 'none'; frame-ancestors 'none'; form-action 'none'");
         addCors(ex);
+        if ("HEAD".equals(ex.getRequestMethod())) {
+            ex.sendResponseHeaders(200, -1);
+            ex.close();
+            return;
+        }
         ex.sendResponseHeaders(200, body.length);
         try (OutputStream os = ex.getResponseBody()) {
             os.write(body);
@@ -187,6 +200,8 @@ public class WebServer {
     private static void addCors(HttpExchange ex) {
         // Permissive CORS so a Capacitor-wrapped native app on the phone can call the API
         var h = ex.getResponseHeaders();
+        h.set("X-Content-Type-Options", "nosniff");
+        h.set("Referrer-Policy", "no-referrer");
         h.set("Access-Control-Allow-Origin", "*");
         h.set("Access-Control-Allow-Methods", "GET, OPTIONS");
         h.set("Access-Control-Allow-Headers", "Content-Type");

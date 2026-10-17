@@ -216,6 +216,23 @@ public class WebServerTest {
         assertEquals(404, get("/%2e%2e/pom.xml").statusCode());
     }
 
+    @Test
+    public void securityHeadersAreSet() throws Exception {
+        HttpResponse<String> page = get("/");
+        assertTrue(page.headers().firstValue("Content-Security-Policy").orElse("").contains("default-src 'self'"));
+        assertEquals("nosniff", page.headers().firstValue("X-Content-Type-Options").orElse(""));
+        assertEquals("nosniff", get("/api/health").headers().firstValue("X-Content-Type-Options").orElse(""));
+    }
+
+    @Test
+    public void headRequestHasNoBody() throws Exception {
+        HttpRequest req = HttpRequest.newBuilder(URI.create(this.base + "/index.html"))
+                .method("HEAD", HttpRequest.BodyPublishers.noBody()).build();
+        HttpResponse<String> res = this.http.send(req, HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, res.statusCode());
+        assertEquals("", res.body());
+    }
+
     private static JsonNode findByType(JsonNode array, String type) {
         for (JsonNode n : array) {
             if (type.equals(n.get("sensorType").asText())) return n;
