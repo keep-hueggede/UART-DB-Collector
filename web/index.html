@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0d1117">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>UART DB Collector</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 14h3v6H4zM10.5 8h3v12h-3zM17 3h3v17h-3z" fill="currentColor" opacity=".85"/>
+      </svg>
+      <div class="brand-text">
+        <h1>UART DB Collector</h1>
+        <p id="status-line" class="status-line">verbinde…</p>
+      </div>
+    </div>
+    <div class="actions">
+      <button id="btn-refresh" class="icon-btn" aria-label="Aktualisieren">
+        <svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4z" fill="currentColor"/></svg>
+      </button>
+      <button id="btn-settings" class="icon-btn" aria-label="Einstellungen">
+        <svg viewBox="0 0 24 24"><path d="M19.14 12.94a7.07 7.07 0 0 0 0-1.88l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96a7.03 7.03 0 0 0-1.62-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54c-.58.24-1.12.55-1.62.94l-2.39-.96a.5.5 0 0 0-.61.22L2.63 8.84a.5.5 0 0 0 .12.64l2.03 1.58a7.07 7.07 0 0 0 0 1.88l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.31.61.22l2.39-.96c.5.39 1.04.7 1.62.94l.36 2.54c.04.24.25.42.5.42h3.84c.25 0 .46-.18.5-.42l.36-2.54c.58-.24 1.12-.55 1.62-.94l2.39.96c.22.09.48 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.64zM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5z" fill="currentColor"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <section id="view-dashboard">
+      <div id="devices" class="device-list"></div>
+      <h2 class="section-title" id="sensors-title">Sensoren</h2>
+      <div id="sensor-grid" class="sensor-grid"></div>
+      <p id="empty-hint" class="empty hidden">Noch keine Messwerte vorhanden.<br>Schalte den Sensor ein und warte auf die nächste Übertragung.</p>
+    </section>
+
+    <section id="view-detail" class="hidden">
+      <button id="btn-back" class="back-btn">
+        <svg viewBox="0 0 24 24"><path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z" fill="currentColor"/></svg>
+        Zurück
+      </button>
+      <div class="detail-head">
+        <span id="detail-icon" class="sensor-icon"></span>
+        <div>
+          <h2 id="detail-title">–</h2>
+          <p id="detail-sub" class="muted">–</p>
+        </div>
+      </div>
+      <div class="detail-value">
+        <span id="detail-current">–</span>
+        <span id="detail-unit" class="unit"></span>
+      </div>
+      <div class="range-tabs" id="range-tabs">
+        <button data-window="3600000">1 h</button>
+        <button data-window="21600000">6 h</button>
+        <button data-window="86400000" class="active">24 h</button>
+        <button data-window="604800000">7 T</button>
+        <button data-window="2592000000">30 T</button>
+      </div>
+      <div id="chart" class="chart-box"></div>
+      <div class="stats-row" id="stats-row">
+        <div class="stat"><span class="stat-label">Min</span><span id="stat-min">–</span></div>
+        <div class="stat"><span class="stat-label">Ø</span><span id="stat-avg">–</span></div>
+        <div class="stat"><span class="stat-label">Max</span><span id="stat-max">–</span></div>
+        <div class="stat"><span class="stat-label">Werte</span><span id="stat-count">–</span></div>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="settings-dialog">
+    <form method="dialog" id="settings-form">
+      <h2>Einstellungen</h2>
+      <label for="set-server">Server-URL</label>
+      <input id="set-server" type="text" inputmode="url" placeholder="leer = aktuelle Seite">
+      <p class="hint">Für die native App auf dem Phone: z.B. <code>http://192.168.1.10:8080</code></p>
+      <label for="set-refresh">Auto-Aktualisierung</label>
+      <select id="set-refresh">
+        <option value="0">aus</option>
+        <option value="10">10 s</option>
+        <option value="30">30 s</option>
+        <option value="60">60 s</option>
+      </select>
+      <div class="dialog-actions">
+        <button value="cancel" class="secondary">Abbrechen</button>
+        <button value="save" id="btn-save-settings">Speichern</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="app.js"></script>
+</body>
+</html>

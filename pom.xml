@@ -69,6 +69,13 @@
       <directory>/test</directory>
       <filtering>true</filtering>
     </resource>
+    <resource>
+      <directory>${project.basedir}</directory>
+      <includes>
+        <include>web/**</include>
+      </includes>
+      <filtering>false</filtering>
+    </resource>
   </resources>
   <plugins>
     <plugin>
