@@ -1,0 +1,27 @@
+# systemd user service for the UART-DB-Collector on the Raspberry Pi.
+# Install (no root needed):
+#   mkdir -p ~/.config/systemd/user
+#   cp uart-db-collector.service ~/.config/systemd/user/
+#   loginctl enable-linger $USER          # start at boot without login
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now uart-db-collector
+# Logs: tail -f ~/app/collector.log
+
+[Unit]
+Description=UART-DB-Collector (ESP32-C6 Thread receiver -> H2 database)
+After=default.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=%h/app
+ExecStart=/usr/bin/java -jar %h/app/app.jar
+Restart=always
+RestartSec=10
+SuccessExitStatus=143
+# The user journal is not readable without extra groups, so log to a file
+StandardOutput=append:%h/app/collector.log
+StandardError=inherit
+
+[Install]
+WantedBy=default.target
