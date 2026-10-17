@@ -145,7 +145,7 @@ function bigChart(points, unit) {
   }
 
   const last = points[points.length - 1];
-  const unitAttr = unit ? ` ${unit}` : "";
+  const unitAttr = unit ? ` ${escapeHtml(unit)}` : "";
   return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Verlauf${unitAttr}">
     <defs>
       <linearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1">
