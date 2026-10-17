@@ -13,6 +13,7 @@ import org.hibernate.service.ServiceRegistry;
 
 import java.util.List;
 import java.util.Properties;
+import java.util.function.Function;
 
 public class ORMapper extends CommonDbConnector {
 
@@ -137,6 +138,23 @@ public class ORMapper extends CommonDbConnector {
     }
 
     public Session getSession() { return this.session; }
+
+    public SessionFactory getSessionFactory() { return this.sessionFactory; }
+
+    /**
+     * Run a read operation in a fresh, short-lived session. The collector
+     * writes through the long-lived session, which must not be shared with
+     * other threads (e.g. the web server's HTTP request threads). The session
+     * is closed (and its first-level cache freed) after the call.
+     */
+    public <T> T readInSession(Function<Session, T> work) {
+        if (this.sessionFactory == null) {
+            throw new IllegalStateException("ORMapper is not connected");
+        }
+        try (Session s = this.sessionFactory.openSession()) {
+            return work.apply(s);
+        }
+    }
 
     @Override
     protected String buildConnectionString(Boolean toDatabase) {
