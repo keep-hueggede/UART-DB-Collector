@@ -15,6 +15,9 @@ StartLimitIntervalSec=0
 [Service]
 Type=simple
 WorkingDirectory=%h/app
+# The Pi has no RTC: wait (max. 2 min) for NTP so measurements get correct timestamps
+ExecStartPre=/bin/sh -c 'for i in $(seq 60); do [ "$(timedatectl show -p NTPSynchronized --value)" = yes ] && exit 0; sleep 2; done; exit 0'
+TimeoutStartSec=180
 ExecStart=/usr/bin/java -jar %h/app/app.jar
 Restart=always
 RestartSec=10
