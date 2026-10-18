@@ -94,6 +94,19 @@
     </form>
   </dialog>
 
+  <dialog id="rename-dialog">
+    <form method="dialog" id="rename-form">
+      <h2>Gerät benennen</h2>
+      <label for="rename-name">Name</label>
+      <input id="rename-name" type="text" maxlength="40" required autocomplete="off">
+      <p class="hint">Hardware-ID: <code id="rename-hwid">–</code></p>
+      <div class="dialog-actions">
+        <button value="cancel" class="secondary" formnovalidate>Abbrechen</button>
+        <button value="save">Speichern</button>
+      </div>
+    </form>
+  </dialog>
+
   <div id="toast" class="toast hidden"></div>
   <script src="app.js"></script>
 </body>

@@ -21,6 +21,20 @@ async function api(path) {
   return res.json();
 }
 
+async function apiPut(path, body) {
+  const res = await fetch(apiUrl(path), {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let msg = "HTTP " + res.status;
+    try { msg = (await res.json()).error || msg; } catch (_) { /* ignore */ }
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
 /* ---------------------------------------------------------------- icons */
 
 const SENSOR_ICONS = {
@@ -212,7 +226,9 @@ function renderDevices(devices) {
         <h3>${escapeHtml(d.name || "–")}</h3>
         <p>${escapeHtml(d.deviceType || "SENSOR")} · ${d.sensorCount || 0} Sensor${d.sensorCount === 1 ? "" : "en"}</p>
       </div>
-      <div class="device-meta">${d.lastSeen ? fmtAge(d.lastSeen) : ""}</div>`;
+      <div class="device-meta">${d.lastSeen ? fmtAge(d.lastSeen) : ""}</div>
+      <button class="icon-btn device-edit" aria-label="Umbenennen">${PENCIL_ICON}</button>`;
+    card.querySelector(".device-edit").addEventListener("click", () => openRename(d));
     root.appendChild(card);
   }
 }
@@ -344,6 +360,35 @@ $("settings-form").addEventListener("submit", () => {
     localStorage.setItem("settings.refreshSec", String(settings.refreshSec));
     scheduleRefresh();
     refresh().then(() => toast("Einstellungen gespeichert")).catch(err => toast(err.message, true));
+  }, 0);
+});
+
+/* -------------------------------------------------------------- rename */
+
+const PENCIL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+
+const renameDlg = $("rename-dialog");
+let renameDevice = null;
+
+function openRename(device) {
+  renameDevice = device;
+  $("rename-name").value = device.name || "";
+  $("rename-hwid").textContent = device.hardwareId || "–";
+  renameDlg.showModal();
+  $("rename-name").select();
+}
+
+$("rename-form").addEventListener("submit", () => {
+  setTimeout(async () => {
+    if (renameDlg.returnValue !== "save" || !renameDevice) return;
+    const name = $("rename-name").value.trim();
+    try {
+      await apiPut(`/api/devices/${renameDevice.id}`, { name });
+      toast("Name gespeichert");
+      await refresh();
+    } catch (err) {
+      toast(err.message, true);
+    }
   }, 0);
 });
 
