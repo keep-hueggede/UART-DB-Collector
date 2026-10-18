@@ -1,5 +1,6 @@
 package WebServer;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
@@ -89,6 +90,8 @@ public class WebServer {
                 sendJson(ex, 200, db.health());
             } else if (path.equals("/api/devices")) {
                 sendJson(ex, 200, db.devices());
+            } else if (path.startsWith("/api/devices/")) {
+                handleRenameDevice(ex, Integer.parseInt(path.substring("/api/devices/".length())));
             } else if (path.equals("/api/sensors")) {
                 sendJson(ex, 200, db.sensors());
             } else if (path.startsWith("/api/sensors/")) {
@@ -125,6 +128,57 @@ public class WebServer {
             // Details go to the log only, not to the client
             ex2.printStackTrace();
             sendError(ex, 500, "internal error");
+        }
+    }
+
+    private static final int MAX_BODY = 4096;
+    private static final int MAX_NAME = 40;
+
+    // PUT /api/devices/{id} {"name": "..."}. Requiring PUT + application/json forces a
+    // CORS preflight, and CORS only allows GET, so foreign websites cannot rename devices.
+    private void handleRenameDevice(HttpExchange ex, int id) throws IOException {
+        if (!"PUT".equals(ex.getRequestMethod())) {
+            sendError(ex, 405, "method not allowed");
+            return;
+        }
+        String ctype = ex.getRequestHeaders().getFirst("Content-Type");
+        if (ctype == null || !ctype.toLowerCase().startsWith("application/json")) {
+            sendError(ex, 415, "content type must be application/json");
+            return;
+        }
+        byte[] body;
+        try (InputStream in = ex.getRequestBody()) {
+            body = in.readNBytes(MAX_BODY + 1);
+        }
+        if (body.length > MAX_BODY) {
+            sendError(ex, 413, "request too large");
+            return;
+        }
+        JsonNode nameNode;
+        try {
+            nameNode = JSON.readTree(body).get("name");
+        } catch (IOException | NullPointerException e) {
+            sendError(ex, 400, "invalid json");
+            return;
+        }
+        if (nameNode == null || !nameNode.isTextual()) {
+            sendError(ex, 400, "missing field: name");
+            return;
+        }
+        String name = nameNode.asText().strip();
+        if (name.isEmpty() || name.length() > MAX_NAME || name.codePoints().anyMatch(Character::isISOControl)) {
+            sendError(ex, 400, "name must be 1-" + MAX_NAME + " characters without control characters");
+            return;
+        }
+        switch (db.renameDevice(id, name)) {
+            case NOT_FOUND -> sendError(ex, 404, "device not found");
+            case NAME_TAKEN -> sendError(ex, 409, "name already in use");
+            default -> {
+                Map<String, Object> out = new LinkedHashMap<>();
+                out.put("id", id);
+                out.put("name", name);
+                sendJson(ex, 200, out);
+            }
         }
     }
 

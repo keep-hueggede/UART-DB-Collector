@@ -162,6 +162,24 @@ public class ORMapper extends CommonDbConnector {
         }
     }
 
+    /** Like readInSession, but inside a transaction that is committed or rolled back. */
+    public <T> T writeInSession(Function<Session, T> work) {
+        if (this.sessionFactory == null) {
+            throw new IllegalStateException("ORMapper is not connected");
+        }
+        try (Session s = this.sessionFactory.openSession()) {
+            Transaction tx = s.beginTransaction();
+            try {
+                T result = work.apply(s);
+                tx.commit();
+                return result;
+            } catch (RuntimeException ex) {
+                if (tx.isActive()) tx.rollback();
+                throw ex;
+            }
+        }
+    }
+
     @Override
     protected String buildConnectionString(Boolean toDatabase) {
         return this.urlPrefix;

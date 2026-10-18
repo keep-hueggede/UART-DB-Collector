@@ -51,6 +51,7 @@ public class DbReader {
                 Map<String, Object> m = new LinkedHashMap<>();
                 m.put("id", d.getId());
                 m.put("name", d.getName());
+                m.put("hardwareId", d.getHardwareId());
                 m.put("deviceType", d.getDeviceType() == null ? null : d.getDeviceType().name());
                 m.put("location", d.getLocation());
                 m.put("online", d.isOnline());
@@ -163,6 +164,22 @@ public class DbReader {
             out.put("stats", statsMap);
             out.put("points", points);
             return out;
+        });
+    }
+
+    public enum RenameResult { OK, NOT_FOUND, NAME_TAKEN }
+
+    /** Set a device's display name (the only write the web API offers). */
+    public RenameResult renameDevice(int id, String name) {
+        return mapper.writeInSession(session -> {
+            Device d = session.get(Device.class, id);
+            if (d == null) return RenameResult.NOT_FOUND;
+            Long taken = session.createQuery(
+                            "SELECT COUNT(d) FROM Device d WHERE d.name = :n AND d.id <> :id", Long.class)
+                    .setParameter("n", name).setParameter("id", id).getSingleResult();
+            if (taken > 0) return RenameResult.NAME_TAKEN;
+            d.setName(name);
+            return RenameResult.OK;
         });
     }
 

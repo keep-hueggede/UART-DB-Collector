@@ -9,6 +9,8 @@ import java.util.List;
 
 @Entity
 @Table(name = "Devices")
+// Only changed columns are written, so lastSeen updates never overwrite a renamed name
+@org.hibernate.annotations.DynamicUpdate
 public class Device {
 
     @Id

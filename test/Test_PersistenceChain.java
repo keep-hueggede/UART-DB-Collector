@@ -42,6 +42,21 @@ public class Test_PersistenceChain {
     }
 
     @Test
+    public void deviceFoundByHardwareIdAfterRename() {
+        Device device = new Device("1051dbfffe60b875", Device.DeviceType.SENSOR, "test");
+        device.setHardwareId("1051dbfffe60b875");
+        mapper.persist(device);
+        device.setName("Garten");
+        mapper.merge(device);
+        mapper.clear();
+
+        Device found = mapper.findByHardwareId(Device.class, "1051dbfffe60b875");
+        assertNotNull(found);
+        assertEquals("Garten", found.getName());
+        assertNull(mapper.findByHardwareId(Device.class, "ffffffffffffffff"));
+    }
+
+    @Test
     public void weatherDataToDatabase() {
         // Device wetter1 anlegen
         Device device = mapper.findByName(Device.class, "wetter1");

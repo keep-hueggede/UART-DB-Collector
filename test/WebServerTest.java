@@ -216,6 +216,56 @@ public class WebServerTest {
         assertEquals(404, get("/%2e%2e/pom.xml").statusCode());
     }
 
+    private HttpResponse<String> put(String path, String contentType, String body) throws Exception {
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(this.base + path))
+                .method("PUT", HttpRequest.BodyPublishers.ofString(body));
+        if (contentType != null) b.header("Content-Type", contentType);
+        return this.http.send(b.build(), HttpResponse.BodyHandlers.ofString());
+    }
+
+    private int deviceId() {
+        return this.mapper.findByName(Device.class, "wetter1").getId();
+    }
+
+    @Test
+    public void renameDevice() throws Exception {
+        int id = deviceId();
+        HttpResponse<String> res = put("/api/devices/" + id, "application/json", "{\"name\":\"  Garten <Nord>  \"}");
+        assertEquals(200, res.statusCode());
+
+        JsonNode devices = this.json.readTree(get("/api/devices").body());
+        assertEquals("Garten <Nord>", devices.get(0).get("name").asText());
+        JsonNode sensors = this.json.readTree(get("/api/sensors").body());
+        assertEquals("Garten <Nord>", sensors.get(0).get("deviceName").asText());
+    }
+
+    @Test
+    public void renameDeviceRejectsBadInput() throws Exception {
+        int id = deviceId();
+        assertEquals(415, put("/api/devices/" + id, "text/plain", "{\"name\":\"x\"}").statusCode());
+        assertEquals(400, put("/api/devices/" + id, "application/json", "{\"name\":\"\"}").statusCode());
+        assertEquals(400, put("/api/devices/" + id, "application/json", "{\"name\":\"a\\nb\"}").statusCode());
+        assertEquals(400, put("/api/devices/" + id, "application/json", "{\"name\":\"" + "x".repeat(41) + "\"}").statusCode());
+        assertEquals(400, put("/api/devices/" + id, "application/json", "not json").statusCode());
+        assertEquals(400, put("/api/devices/" + id, "application/json", "{\"name\":5}").statusCode());
+        assertEquals(413, put("/api/devices/" + id, "application/json", "x".repeat(5000)).statusCode());
+        assertEquals(404, put("/api/devices/999999", "application/json", "{\"name\":\"x\"}").statusCode());
+        assertEquals(405, get("/api/devices/" + id).statusCode());
+    }
+
+    @Test
+    public void renameDeviceRejectsDuplicateName() throws Exception {
+        Device other = new Device("garten2", Device.DeviceType.SENSOR, "test");
+        this.mapper.persist(other);
+        assertEquals(409, put("/api/devices/" + deviceId(), "application/json", "{\"name\":\"garten2\"}").statusCode());
+    }
+
+    @Test
+    public void corsDoesNotAllowWrites() throws Exception {
+        String methods = get("/api/health").headers().firstValue("Access-Control-Allow-Methods").orElse("");
+        assertFalse(methods.contains("PUT"));
+    }
+
     @Test
     public void securityHeadersAreSet() throws Exception {
         HttpResponse<String> page = get("/");
