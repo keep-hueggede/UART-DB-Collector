@@ -92,12 +92,14 @@ public class Controller implements IObserverListener {
         System.out.println("UART-DB-Collector beendet.");
     }
 
-    private Device getOrCreateDevice(String name) {
-        Device device = this.mapper.findByName(Device.class, name);
+    private Device getOrCreateDevice(String hardwareId) {
+        Device device = this.mapper.findByHardwareId(Device.class, hardwareId);
         if (device == null) {
-            device = new Device(name, Device.DeviceType.SENSOR, "unknown");
+            // Name defaults to the hardware id until the user renames it in the web app
+            device = new Device(hardwareId, Device.DeviceType.SENSOR, "unknown");
+            device.setHardwareId(hardwareId);
             this.mapper.persist(device);
-            System.out.println("  Neues Device: " + name);
+            System.out.println("  Neues Device: " + hardwareId);
         }
         device.setOnline(true);
         device.setLastSeen(new Date());

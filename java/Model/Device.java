@@ -18,6 +18,10 @@ public class Device {
     @Column(name = "Name", unique = true, nullable = false)
     private String name;
 
+    // Unique id reported by the node ("src"); the name is assigned by the user
+    @Column(name = "HardwareId", unique = true)
+    private String hardwareId;
+
     @Column(name = "DeviceType")
     @Enumerated(EnumType.STRING)
     private DeviceType deviceType;
@@ -56,6 +60,8 @@ public class Device {
     public int getId() { return id; }
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
+    public String getHardwareId() { return hardwareId; }
+    public void setHardwareId(String hardwareId) { this.hardwareId = hardwareId; }
     public DeviceType getDeviceType() { return deviceType; }
     public void setDeviceType(DeviceType deviceType) { this.deviceType = deviceType; }
     public String getLocation() { return location; }

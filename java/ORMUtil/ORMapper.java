@@ -112,6 +112,12 @@ public class ORMapper extends CommonDbConnector {
                 .uniqueResult();
     }
 
+    public <T> T findByHardwareId(Class<T> type, String hardwareId) {
+        return this.session.createQuery("FROM " + type.getSimpleName() + " WHERE hardwareId = :hw", type)
+                .setParameter("hw", hardwareId)
+                .uniqueResult();
+    }
+
     public <T> T findByNameAndDevice(Class<T> type, String name, Object device) {
         return this.session.createQuery(
                 "FROM " + type.getSimpleName() + " WHERE name = :name AND device = :device", type)
