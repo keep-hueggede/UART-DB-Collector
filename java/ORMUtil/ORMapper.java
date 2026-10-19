@@ -162,7 +162,12 @@ public class ORMapper extends CommonDbConnector {
         }
     }
 
-    /** Like readInSession, but inside a transaction that is committed or rolled back. */
+    /**
+     * Run a write operation in a fresh, short-lived session with its own
+     * transaction. Commits on success, rolls back on any RuntimeException so
+     * a failed write never leaves a half-open transaction behind. Used by the
+     * web server; the collector keeps writing through the long-lived session.
+     */
     public <T> T writeInSession(Function<Session, T> work) {
         if (this.sessionFactory == null) {
             throw new IllegalStateException("ORMapper is not connected");

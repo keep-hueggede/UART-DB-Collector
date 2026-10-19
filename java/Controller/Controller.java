@@ -4,10 +4,14 @@ import Model.Actuator;
 import Model.Device;
 import Model.Measurement;
 import Model.Sensor;
+import Model.UserAccount;
+import Model.UserDevice;
 import Listener.IObserverListener;
 import ORMUtil.ORMapper;
 import UARTCom.UARTCom;
 import WebServer.DbReader;
+import WebServer.GoogleAuth;
+import WebServer.SessionManager;
 import WebServer.WebServer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -49,7 +53,8 @@ public class Controller implements IObserverListener {
             String dbPass = prop.getProperty("DB.PASSWORD", "");
 
             this.mapper = new ORMapper(dbHost, dbPort, dbName, dbUser, dbPass, dbDriver,
-                    List.of(Device.class, Sensor.class, Measurement.class, Actuator.class));
+                    List.of(Device.class, Sensor.class, Measurement.class, Actuator.class,
+                            UserAccount.class, UserDevice.class));
             this.mapper.connect();
 
             String uartPort = prop.getProperty("UART.PORTNAME", "/dev/serial0");
@@ -63,8 +68,19 @@ public class Controller implements IObserverListener {
                 String serverHost = prop.getProperty("SERVER.HOST", "0.0.0.0");
                 int serverPort = Integer.parseInt(prop.getProperty("SERVER.PORT", "8080"));
                 String webRoot = prop.getProperty("SERVER.WEBROOT", "./web");
-                this.webServer = new WebServer(new DbReader(this.mapper), serverHost, serverPort, webRoot);
+                boolean secureCookie = Boolean.parseBoolean(prop.getProperty("SERVER.SECURE_COOKIE", "false"));
+                GoogleAuth google = new GoogleAuth(
+                        prop.getProperty("GOOGLE.CLIENT_ID", ""),
+                        prop.getProperty("GOOGLE.CLIENT_SECRET", ""),
+                        prop.getProperty("GOOGLE.REDIRECT_URI", ""));
+                SessionManager sessions = new SessionManager();
+                this.webServer = new WebServer(new DbReader(this.mapper), sessions, google,
+                        serverHost, serverPort, webRoot, secureCookie);
                 this.webServer.start();
+                if (!google.isConfigured()) {
+                    System.out.println("Web:  Google-Login nicht konfiguriert "
+                            + "(GOOGLE.CLIENT_ID / GOOGLE.CLIENT_SECRET fehlen)");
+                }
             }
 
             System.out.println("UART-DB-Collector gestartet.");
