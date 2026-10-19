@@ -1,4 +1,4 @@
-const CACHE = "uart-db-v2";
+const CACHE = "uart-db-v3";
 const SHELL = [
   "./",
   "index.html",
@@ -29,13 +29,17 @@ self.addEventListener("fetch", event => {
   const url = new URL(event.request.url);
   if (event.request.method !== "GET" || url.origin !== self.location.origin) return;
 
-  // API: network first, fall back to last cached data when offline
+  // API: network first, fall back to last cached data when offline.
+  // Only successful responses are cached - a replayed 401/500 would
+  // wrongly show the login screen (or an error) while offline.
   if (url.pathname.startsWith("/api/")) {
     event.respondWith(
       fetch(event.request)
         .then(res => {
-          const copy = res.clone();
-          caches.open(CACHE).then(cache => cache.put(event.request, copy));
+          if (res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE).then(cache => cache.put(event.request, copy));
+          }
           return res;
         })
         .catch(() => caches.match(event.request))
