@@ -20,6 +20,20 @@ SERVER.HOST=0.0.0.0
 SERVER.PORT=8080
 # Statische App-Dateien; fallback ist das mitgelieferte web/ im jar.
 SERVER.WEBROOT=./web
+# Cookie "Secure"-Flag setzen, wenn hinter HTTPS (z.B. Reverse-Proxy/SSH-Tunnel).
+SERVER.SECURE_COOKIE=false
+
+# === Google-Login (Pflicht fuer den Web-Zugang) ===
+# Google Cloud Console -> APIs & Dienste -> OAuth-Berechtigungen:
+#   - "Webanwendung"-OAuth-Client erstellen
+#   - Autorisierte Weiterleitungs-URIs: http://<server-ip>:8080/auth/callback
+# Ohne diese Werte bleibt die API gesperrt (401) und der Login-Button
+# zeigt einen Hinweis.
+GOOGLE.CLIENT_ID=
+GOOGLE.CLIENT_SECRET=
+# Optional: abweichende Weiterleitungs-URI; sonst wird sie aus dem
+# Host-Header des Requests abgeleitet.
+GOOGLE.REDIRECT_URI=
 
 # === SSH-Tunnel (aktivieren wenn Remote-DB existiert) ===
 SSH.HOST=
