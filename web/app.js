@@ -7,31 +7,47 @@ const settings = {
   refreshSec: parseInt(localStorage.getItem("settings.refreshSec") || "30", 10),
 };
 
+const TOKEN_KEY = "auth.token";
+
 function apiUrl(path) {
   return (settings.serverUrl.replace(/\/+$/, "")) + path;
 }
 
-async function api(path) {
-  const res = await fetch(apiUrl(path), { headers: { Accept: "application/json" } });
-  if (!res.ok) {
-    let msg = "HTTP " + res.status;
-    try { msg = (await res.json()).error || msg; } catch (_) { /* ignore */ }
-    throw new Error(msg);
-  }
-  return res.json();
+function authHeaders() {
+  const headers = { Accept: "application/json" };
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (token) headers.Authorization = "Bearer " + token;
+  return headers;
 }
 
-async function apiPut(path, body) {
+class AuthRequired extends Error {
+  constructor(configured) {
+    super("unauthorized");
+    this.isAuth = true;
+    this.configured = configured;
+  }
+}
+
+async function api(path, options = {}) {
+  const headers = authHeaders();
+  if (options.body) headers["Content-Type"] = "application/json";
   const res = await fetch(apiUrl(path), {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify(body),
+    method: options.method || "GET",
+    headers,
+    body: options.body,
   });
+  if (res.status === 401) {
+    let configured = true;
+    try { configured = (await res.json()).authConfigured !== false; } catch (_) { /* ignore */ }
+    showLogin(configured);
+    throw new AuthRequired(configured);
+  }
   if (!res.ok) {
     let msg = "HTTP " + res.status;
     try { msg = (await res.json()).error || msg; } catch (_) { /* ignore */ }
     throw new Error(msg);
   }
+  if (res.status === 204) return null;
   return res.json();
 }
 
@@ -98,6 +114,10 @@ function el(tag, cls, html) {
   return e;
 }
 
+function escapeHtml(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
 let toastTimer = null;
 function toast(msg, isErr) {
   const t = document.getElementById("toast");
@@ -159,7 +179,7 @@ function bigChart(points, unit) {
   }
 
   const last = points[points.length - 1];
-  const unitAttr = unit ? ` ${escapeHtml(unit)}` : "";
+  const unitAttr = unit ? ` ${unit}` : "";
   return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Verlauf${unitAttr}">
     <defs>
       <linearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1">
@@ -176,16 +196,80 @@ function bigChart(points, unit) {
   </svg>`;
 }
 
-/* ------------------------------------------------------------ dashboard */
+/* ------------------------------------------------------------ app state */
 
 const state = {
   sensors: [],
   rangeMs: 86400000,
   refreshTimer: null,
   currentSensorId: null,
+  loggedIn: false,
 };
 
 const $ = id => document.getElementById(id);
+
+/* ------------------------------------------------------------ auth flow */
+
+/** Picks up the one-time token from the OAuth redirect fragment and
+ *  immediately removes it from the URL/history. */
+function consumeAuthFragment() {
+  const hash = location.hash || "";
+  if (hash.startsWith("#token=")) {
+    const token = hash.substring("#token=".length).split("&")[0];
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    history.replaceState(null, "", location.pathname + location.search);
+    return "ok";
+  }
+  if (hash === "#auth-error") {
+    history.replaceState(null, "", location.pathname + location.search);
+    return "error";
+  }
+  return null;
+}
+
+function showLogin(configured) {
+  state.loggedIn = false;
+  clearInterval(state.refreshTimer);
+  $("login-screen").classList.remove("hidden");
+  $("login-error").classList.add("hidden");
+  $("login-config-hint").classList.toggle("hidden", configured !== false);
+  $("user-chip").classList.add("hidden");
+  $("btn-logout").classList.add("hidden");
+  document.querySelector("main").classList.add("faded");
+}
+
+function showApp(me) {
+  state.loggedIn = true;
+  $("login-screen").classList.add("hidden");
+  document.querySelector("main").classList.remove("faded");
+  if (me) {
+    $("user-chip").classList.remove("hidden");
+    $("btn-logout").classList.remove("hidden");
+    $("user-name").textContent = me.name || me.email || "";
+    const pic = $("user-pic");
+    if (me.picture && /^https:\/\//.test(me.picture)) {
+      pic.src = me.picture;
+      pic.classList.remove("hidden");
+    } else {
+      pic.classList.add("hidden");
+    }
+  }
+}
+
+$("btn-login").addEventListener("click", () => {
+  // full-page navigation to the server so the callback lands on our origin
+  location.href = apiUrl("/auth/login");
+});
+
+$("btn-logout").addEventListener("click", async () => {
+  try {
+    await fetch(apiUrl("/auth/logout"), { method: "POST", headers: authHeaders() });
+  } catch (_) { /* best effort */ }
+  localStorage.removeItem(TOKEN_KEY);
+  location.reload();
+});
+
+/* ------------------------------------------------------------ dashboard */
 
 async function loadDashboard() {
   const [devices, sensors, latest] = await Promise.all([
@@ -203,17 +287,18 @@ async function loadDashboard() {
   line.className = "status-line ok";
   line.textContent = latestTs
     ? `Letzter Wert ${fmtAge(latestTs)}`
-    : `${sensors.length} Sensor${sensors.length === 1 ? "" : "en"} · noch keine Werte`;
+    : `${sensors.length} Sensor${sensors.length === 1 ? "" : "en"} · keine eigenen Daten`;
 
-  // sparklines: fetch 24h history for each sensor in parallel (small payloads)
   await Promise.all(sensors.map(async s => {
     try {
       const data = await api(`/api/measurements?sensorId=${s.id}&window=86400000&limit=500`);
-      const card = document.querySelector(`.sensor-card[data-id="${s.id}"] .sensor-spark-slot`);
-      if (card) card.innerHTML = sparkline(data.points);
+      const slot = document.querySelector(`.sensor-card[data-id="${s.id}"] .sensor-spark-slot`);
+      if (slot) slot.innerHTML = sparkline(data.points);
     } catch (_) { /* sparkline is optional */ }
   }));
 }
+
+const PENCIL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
 
 function renderDevices(devices) {
   const root = $("devices");
@@ -228,7 +313,10 @@ function renderDevices(devices) {
       </div>
       <div class="device-meta">${d.lastSeen ? fmtAge(d.lastSeen) : ""}</div>
       <button class="icon-btn device-edit" aria-label="Umbenennen">${PENCIL_ICON}</button>`;
-    card.querySelector(".device-edit").addEventListener("click", () => openRename(d));
+    card.querySelector(".device-edit").addEventListener("click", e => {
+      e.stopPropagation();
+      openRename(d);
+    });
     root.appendChild(card);
   }
 }
@@ -252,10 +340,6 @@ function renderSensors(sensors, latest) {
     card.addEventListener("click", () => openDetail(s.id));
     grid.appendChild(card);
   }
-}
-
-function escapeHtml(s) {
-  return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
 /* --------------------------------------------------------------- detail */
@@ -301,71 +385,102 @@ $("range-tabs").addEventListener("click", e => {
   if (!btn) return;
   state.rangeMs = parseInt(btn.dataset.window, 10);
   for (const b of $("range-tabs").children) b.classList.toggle("active", b === btn);
-  loadDetail().catch(err => toast(err.message, true));
+  loadDetail().catch(err => { if (!err.isAuth) toast(err.message, true); });
 });
 
-/* -------------------------------------------------------- refresh loop */
+/* ------------------------------------------------- device management */
 
-async function refresh() {
-  const btn = $("btn-refresh");
-  btn.classList.add("spinning");
+const devicesDialog = $("devices-dialog");
+
+$("btn-manage-devices").addEventListener("click", () => openManageDevices().catch(err => toast(err.message, true)));
+
+async function openManageDevices() {
+  const [linked, available] = await Promise.all([
+    api("/api/devices"),
+    api("/api/devices/available"),
+  ]);
+  renderDeviceLists(linked, available);
+  devicesDialog.showModal();
+}
+
+function renderDeviceLists(linked, available) {
+  const linkedRoot = $("linked-devices");
+  linkedRoot.innerHTML = "";
+  $("linked-empty").classList.toggle("hidden", linked.length > 0);
+  for (const d of linked) {
+    const row = el("div", "dev-row");
+    row.innerHTML = `
+      <div class="dev-info">
+        <span class="device-dot ${d.online ? "on" : ""}"></span>
+        <span class="dev-name">${escapeHtml(d.name)}</span>
+        <span class="dev-type">${escapeHtml(d.deviceType || "")}</span>
+      </div>
+      <button class="small-btn danger" data-unlink="${d.id}">Entfernen</button>`;
+    linkedRoot.appendChild(row);
+  }
+
+  const availRoot = $("available-devices");
+  availRoot.innerHTML = "";
+  $("available-empty").classList.toggle("hidden", available.length > 0);
+  for (const d of available) {
+    const row = el("div", "dev-row");
+    row.innerHTML = `
+      <div class="dev-info">
+        <span class="device-dot ${d.online ? "on" : ""}"></span>
+        <span class="dev-name">${escapeHtml(d.name)}</span>
+        <span class="dev-type">${escapeHtml(d.deviceType || "")}</span>
+      </div>
+      <button class="small-btn" data-link="${d.id}">Hinzufügen</button>`;
+    availRoot.appendChild(row);
+  }
+}
+
+devicesDialog.addEventListener("click", async e => {
+  const linkId = e.target.dataset?.link;
+  const unlinkId = e.target.dataset?.unlink;
   try {
-    if (state.currentSensorId != null) {
-      await loadDetail();
-    } else {
-      await loadDashboard();
+    if (linkId) {
+      await api("/api/devices", { method: "POST", body: JSON.stringify({ deviceId: Number(linkId) }) });
+      await refreshDeviceLists();
+      toast("Gerät verknüpft");
+    } else if (unlinkId) {
+      await api(`/api/devices/${unlinkId}`, { method: "DELETE" });
+      await refreshDeviceLists();
+      toast("Verknüpfung entfernt");
     }
   } catch (err) {
-    const line = $("status-line");
-    line.className = "status-line err";
-    line.textContent = "Server nicht erreichbar";
-    throw err;
-  } finally {
-    btn.classList.remove("spinning");
+    if (!err.isAuth) toast(err.message, true);
   }
+});
+
+async function refreshDeviceLists() {
+  const [linked, available] = await Promise.all([
+    api("/api/devices"),
+    api("/api/devices/available"),
+  ]);
+  renderDeviceLists(linked, available);
 }
 
-function scheduleRefresh() {
-  clearInterval(state.refreshTimer);
-  if (settings.refreshSec > 0) {
-    state.refreshTimer = setInterval(() => {
-      refresh().catch(err => toast(err.message, true));
-    }, settings.refreshSec * 1000);
+$("btn-add-device").addEventListener("click", async () => {
+  const input = $("new-device-name");
+  const name = input.value.trim();
+  if (!name) { toast("Name eingeben", true); return; }
+  try {
+    const dev = await api("/api/devices", { method: "POST", body: JSON.stringify({ name }) });
+    input.value = "";
+    await refreshDeviceLists();
+    toast(dev.created ? `Gerät "${dev.name}" angelegt und verknüpft` : `Gerät "${dev.name}" verknüpft`);
+  } catch (err) {
+    if (!err.isAuth) toast(err.message, true);
   }
-}
-
-$("btn-refresh").addEventListener("click", () => refresh().catch(err => toast(err.message, true)));
-
-document.addEventListener("visibilitychange", () => {
-  if (!document.hidden) refresh().catch(() => {});
 });
 
-/* ------------------------------------------------------------ settings */
-
-const dlg = $("settings-dialog");
-
-$("btn-settings").addEventListener("click", () => {
-  $("set-server").value = settings.serverUrl;
-  $("set-refresh").value = String(settings.refreshSec);
-  dlg.showModal();
+$("btn-close-devices").addEventListener("click", () => {
+  devicesDialog.close();
+  refresh().catch(() => {});
 });
 
-$("settings-form").addEventListener("submit", () => {
-  // dialog closes automatically (method=dialog); persist on next tick
-  setTimeout(() => {
-    if (dlg.returnValue !== "save") return;
-    settings.serverUrl = $("set-server").value.trim();
-    settings.refreshSec = parseInt($("set-refresh").value, 10);
-    localStorage.setItem("settings.serverUrl", settings.serverUrl);
-    localStorage.setItem("settings.refreshSec", String(settings.refreshSec));
-    scheduleRefresh();
-    refresh().then(() => toast("Einstellungen gespeichert")).catch(err => toast(err.message, true));
-  }, 0);
-});
-
-/* -------------------------------------------------------------- rename */
-
-const PENCIL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+/* --------------------------------------------------------------- rename */
 
 const renameDlg = $("rename-dialog");
 let renameDevice = null;
@@ -383,11 +498,77 @@ $("rename-form").addEventListener("submit", () => {
     if (renameDlg.returnValue !== "save" || !renameDevice) return;
     const name = $("rename-name").value.trim();
     try {
-      await apiPut(`/api/devices/${renameDevice.id}`, { name });
+      await api(`/api/devices/${renameDevice.id}`, {
+        method: "PUT",
+        body: JSON.stringify({ name }),
+      });
       toast("Name gespeichert");
       await refresh();
     } catch (err) {
-      toast(err.message, true);
+      if (!err.isAuth) toast(err.message, true);
+    }
+  }, 0);
+});
+
+/* -------------------------------------------------------- refresh loop */
+
+async function refresh() {
+  const btn = $("btn-refresh");
+  btn.classList.add("spinning");
+  try {
+    if (state.currentSensorId != null) {
+      await loadDetail();
+    } else {
+      await loadDashboard();
+    }
+  } catch (err) {
+    if (err.isAuth) throw err; // login screen already shown
+    const line = $("status-line");
+    line.className = "status-line err";
+    line.textContent = "Server nicht erreichbar";
+    throw err;
+  } finally {
+    btn.classList.remove("spinning");
+  }
+}
+
+function scheduleRefresh() {
+  clearInterval(state.refreshTimer);
+  if (settings.refreshSec > 0) {
+    state.refreshTimer = setInterval(() => {
+      refresh().catch(err => { if (!err.isAuth) toast(err.message, true); });
+    }, settings.refreshSec * 1000);
+  }
+}
+
+$("btn-refresh").addEventListener("click", () => {
+  refresh().catch(err => { if (!err.isAuth) toast(err.message, true); });
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && state.loggedIn) refresh().catch(() => {});
+});
+
+/* ------------------------------------------------------------ settings */
+
+const dlg = $("settings-dialog");
+
+$("btn-settings").addEventListener("click", () => {
+  $("set-server").value = settings.serverUrl;
+  $("set-refresh").value = String(settings.refreshSec);
+  dlg.showModal();
+});
+
+$("settings-form").addEventListener("submit", () => {
+  setTimeout(() => {
+    if (dlg.returnValue !== "save") return;
+    settings.serverUrl = $("set-server").value.trim();
+    settings.refreshSec = parseInt($("set-refresh").value, 10);
+    localStorage.setItem("settings.serverUrl", settings.serverUrl);
+    localStorage.setItem("settings.refreshSec", String(settings.refreshSec));
+    scheduleRefresh();
+    if (state.loggedIn) {
+      refresh().then(() => toast("Einstellungen gespeichert")).catch(err => toast(err.message, true));
     }
   }, 0);
 });
@@ -400,5 +581,21 @@ if ("serviceWorker" in navigator) {
   });
 }
 
-refresh().catch(err => toast(err.message, true));
-scheduleRefresh();
+(async function boot() {
+  const fragment = consumeAuthFragment();
+  try {
+    const me = await api("/api/auth/me");
+    showApp(me);
+    if (fragment === "ok") toast("Angemeldet");
+  } catch (err) {
+    if (err.isAuth) {
+      if (fragment === "error") $("login-error").classList.remove("hidden");
+      return; // login screen is up
+    }
+    // offline / server hiccup: keep the shell alive, SW serves cached data
+    showApp(null);
+  }
+  if (fragment === "error") toast("Google-Anmeldung fehlgeschlagen", true);
+  refresh().catch(err => { if (!err.isAuth) toast(err.message, true); });
+  scheduleRefresh();
+})();

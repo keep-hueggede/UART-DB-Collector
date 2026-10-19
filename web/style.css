@@ -328,3 +328,168 @@ dialog code { background: var(--bg-elevated); padding: 1px 5px; border-radius: 5
   text-align: center;
 }
 .toast.err { border-color: var(--danger); color: var(--danger); }
+
+/* ------------------------------------------------------------- section */
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.section-head .section-title { margin-top: 22px; }
+
+.text-btn {
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 0;
+  margin-top: 16px;
+}
+
+main.faded { display: none; }
+
+/* ---------------------------------------------------------- login page */
+
+.login-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--bg);
+}
+
+.login-card {
+  width: min(100%, 360px);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.login-logo { width: 56px; height: 56px; color: var(--accent); }
+.login-card h1 { margin: 0; font-size: 22px; }
+.login-sub { margin: 0; font-size: 14px; color: var(--text-muted); line-height: 1.5; }
+
+.google-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  padding: 13px 18px;
+  margin-top: 6px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  color: #1f1f1f;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.google-btn:active { background: #f1f1f1; }
+.google-btn svg { width: 20px; height: 20px; }
+
+.hint-err { color: var(--danger); }
+
+/* ----------------------------------------------------------- user chip */
+
+.user-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 4px 10px 4px 4px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  max-width: 40vw;
+}
+.user-pic {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--bg);
+}
+.user-name {
+  font-size: 12px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ------------------------------------------------------ device dialog */
+
+.dialog-subtitle {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text-muted);
+  margin: 18px 0 8px;
+}
+
+.dev-list { display: flex; flex-direction: column; gap: 6px; }
+
+.dev-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.dev-info { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.dev-name {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dev-type { font-size: 11px; color: var(--text-muted); }
+
+.small-btn {
+  flex: none;
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.small-btn.danger { background: transparent; color: var(--danger); border-color: rgba(248, 81, 73, .4); }
+
+.primary-btn {
+  flex: none;
+  padding: 11px 16px;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #04231f;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.row { display: flex; gap: 8px; }
+.row input { flex: 1; min-width: 0; }
+
+.device-edit { flex: none; width: 36px; height: 36px; margin-right: -8px; }
+.device-edit svg { width: 18px; height: 18px; }

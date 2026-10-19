@@ -24,6 +24,13 @@
       </div>
     </div>
     <div class="actions">
+      <div id="user-chip" class="user-chip hidden">
+        <img id="user-pic" class="user-pic hidden" alt="">
+        <span id="user-name" class="user-name"></span>
+      </div>
+      <button id="btn-logout" class="icon-btn hidden" aria-label="Abmelden">
+        <svg viewBox="0 0 24 24"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8v-2H4z" fill="currentColor"/></svg>
+      </button>
       <button id="btn-refresh" class="icon-btn" aria-label="Aktualisieren">
         <svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4z" fill="currentColor"/></svg>
       </button>
@@ -35,10 +42,17 @@
 
   <main>
     <section id="view-dashboard">
+      <div class="section-head" id="devices-head">
+        <h2 class="section-title">Geräte</h2>
+        <button id="btn-manage-devices" class="text-btn">Verwalten</button>
+      </div>
       <div id="devices" class="device-list"></div>
-      <h2 class="section-title" id="sensors-title">Sensoren</h2>
+      <div class="section-head">
+        <h2 class="section-title" id="sensors-title">Sensoren</h2>
+      </div>
       <div id="sensor-grid" class="sensor-grid"></div>
-      <p id="empty-hint" class="empty hidden">Noch keine Messwerte vorhanden.<br>Schalte den Sensor ein und warte auf die nächste Übertragung.</p>
+      <p id="empty-hint" class="empty hidden">Noch keine Messwerte vorhanden.<br>
+        Verknüpfe über "Verwalten" ein Feldgerät oder schalte den Sensor ein.</p>
     </section>
 
     <section id="view-detail" class="hidden">
@@ -74,6 +88,73 @@
     </section>
   </main>
 
+  <!-- ------------------------------------------------------ login screen -->
+
+  <div id="login-screen" class="login-screen hidden">
+    <div class="login-card">
+      <svg class="login-logo" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 14h3v6H4zM10.5 8h3v12h-3zM17 3h3v17h-3z" fill="currentColor" opacity=".85"/>
+      </svg>
+      <h1>UART DB Collector</h1>
+      <p class="login-sub">Sensordaten mit deinem Google-Konto anzeigen – keine Registrierung nötig.</p>
+      <button id="btn-login" class="google-btn">
+        <svg viewBox="0 0 48 48" aria-hidden="true">
+          <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+          <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+          <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+          <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+        </svg>
+        Mit Google anmelden
+      </button>
+      <p id="login-error" class="hint hint-err hidden">Anmeldung abgebrochen oder fehlgeschlagen. Bitte erneut versuchen.</p>
+      <p id="login-config-hint" class="hint hidden">
+        Der Google-Login ist auf dem Server noch nicht konfiguriert.<br>
+        <code>GOOGLE.CLIENT_ID</code> und <code>GOOGLE.CLIENT_SECRET</code> in der <code>app.config</code> eintragen.
+      </p>
+      <p class="hint">Daten sind nur sichtbar, wenn das Feldgerät mit deinem Konto verknüpft ist.</p>
+    </div>
+  </div>
+
+  <!-- --------------------------------------------- device management -->
+
+  <dialog id="devices-dialog">
+    <h2>Feldgeräte verwalten</h2>
+
+    <h3 class="dialog-subtitle">Verknüpft</h3>
+    <div id="linked-devices" class="dev-list"></div>
+    <p id="linked-empty" class="hint hidden">Noch keine Geräte verknüpft.</p>
+
+    <h3 class="dialog-subtitle">In der Datenbank vorhanden</h3>
+    <div id="available-devices" class="dev-list"></div>
+    <p id="available-empty" class="hint hidden">Keine weiteren Geräte vorhanden.</p>
+
+    <h3 class="dialog-subtitle">Nach Namen hinzufügen</h3>
+    <div class="row">
+      <input id="new-device-name" type="text" placeholder="z.B. wetter1" maxlength="100" autocomplete="off">
+      <button id="btn-add-device" class="primary-btn">Hinzufügen</button>
+    </div>
+    <p class="hint">Ein neuer Name legt das Gerät an, sobald die Edge-Device Daten dafür meldet.</p>
+
+    <div class="dialog-actions">
+      <button value="close" id="btn-close-devices">Fertig</button>
+    </div>
+  </dialog>
+
+  <dialog id="rename-dialog">
+    <form method="dialog" id="rename-form">
+      <h2>Gerät benennen</h2>
+      <label for="rename-name">Name</label>
+      <input id="rename-name" type="text" maxlength="40" required autocomplete="off">
+      <p class="hint">Hardware-ID: <code id="rename-hwid">–</code></p>
+      <div class="dialog-actions">
+        <button value="cancel" class="secondary" formnovalidate>Abbrechen</button>
+        <button value="save">Speichern</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- -------------------------------------------------------- settings -->
+
   <dialog id="settings-dialog">
     <form method="dialog" id="settings-form">
       <h2>Einstellungen</h2>
@@ -90,19 +171,6 @@
       <div class="dialog-actions">
         <button value="cancel" class="secondary">Abbrechen</button>
         <button value="save" id="btn-save-settings">Speichern</button>
-      </div>
-    </form>
-  </dialog>
-
-  <dialog id="rename-dialog">
-    <form method="dialog" id="rename-form">
-      <h2>Gerät benennen</h2>
-      <label for="rename-name">Name</label>
-      <input id="rename-name" type="text" maxlength="40" required autocomplete="off">
-      <p class="hint">Hardware-ID: <code id="rename-hwid">–</code></p>
-      <div class="dialog-actions">
-        <button value="cancel" class="secondary" formnovalidate>Abbrechen</button>
-        <button value="save">Speichern</button>
       </div>
     </form>
   </dialog>
