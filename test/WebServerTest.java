@@ -314,6 +314,7 @@ public class WebServerTest {
         assertEquals(20.0, stats.get("min").asDouble(), 0.001);
         assertEquals(24.0, stats.get("max").asDouble(), 0.001);
         assertEquals(22.0, stats.get("avg").asDouble(), 0.001);
+        assertEquals(66.0, stats.get("sum").asDouble(), 0.001);
     }
 
     @Test

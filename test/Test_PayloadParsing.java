@@ -44,6 +44,17 @@ public class Test_PayloadParsing {
     }
 
     @Test
+    public void deepSleepNodeFormatWithBattery() throws Exception {
+        String line = "{\"src\":\"1051dbfffe60b875\",\"temp\":23.4,\"wind\":0.01,\"rain\":0.90,\"tips\":2,\"battery\":2.61}";
+        Controller.ParsedData p = Controller.parseLine(om.readTree(line));
+
+        assertEquals("1051dbfffe60b875", p.src);
+        assertEquals(0.90, p.values.get(Sensor.SensorType.RAIN));
+        assertEquals(2.61, p.values.get(Sensor.SensorType.VOLTAGE));
+        assertEquals(4, p.values.size()); // "tips" is informational only
+    }
+
+    @Test
     public void missingFieldsAreSkipped() throws Exception {
         String line = "{\"src\":\"wald2\",\"rain\":1.35}";
         Controller.ParsedData p = Controller.parseLine(om.readTree(line));

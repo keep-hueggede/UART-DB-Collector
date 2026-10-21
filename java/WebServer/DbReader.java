@@ -318,7 +318,7 @@ public class DbReader {
             if (to != null)   range += " AND m.timestamp <= :to";
 
             var statsQuery = session.createQuery(
-                            "SELECT MIN(m.value), MAX(m.value), AVG(m.value), COUNT(m) "
+                            "SELECT MIN(m.value), MAX(m.value), AVG(m.value), COUNT(m), SUM(m.value) "
                                     + "FROM Measurement m WHERE m.sensor.id = :sid" + range,
                             Object[].class)
                     .setParameter("sid", sensorId);
@@ -332,6 +332,9 @@ public class DbReader {
             statsMap.put("max", stats[1]);
             statsMap.put("avg", stats[2] == null ? null
                     : Math.round(((Number) stats[2]).doubleValue() * 1000.0) / 1000.0);
+            // Meaningful for per-interval values such as rain
+            statsMap.put("sum", stats[4] == null ? 0.0
+                    : Math.round(((Number) stats[4]).doubleValue() * 1000.0) / 1000.0);
 
             var pointQuery = session.createQuery(
                             "FROM Measurement m WHERE m.sensor.id = :sid" + range
