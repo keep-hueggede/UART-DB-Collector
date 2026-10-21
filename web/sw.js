@@ -1,4 +1,4 @@
-const CACHE = "uart-db-v3";
+const CACHE = "uart-db-v4";
 const SHELL = [
   "./",
   "index.html",

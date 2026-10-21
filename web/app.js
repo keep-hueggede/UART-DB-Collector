@@ -294,6 +294,12 @@ async function loadDashboard() {
       const data = await api(`/api/measurements?sensorId=${s.id}&window=86400000&limit=500`);
       const slot = document.querySelector(`.sensor-card[data-id="${s.id}"] .sensor-spark-slot`);
       if (slot) slot.innerHTML = sparkline(data.points);
+      // Rain arrives per report interval: the card shows the 24 h total instead
+      if (s.sensorType === "RAIN") {
+        const card = document.querySelector(`.sensor-card[data-id="${s.id}"]`);
+        card.querySelector(".sensor-value").innerHTML =
+          `${fmtValue(data.stats?.sum ?? 0)}<span class="unit">${escapeHtml(s.unit || "")} / 24 h</span>`;
+      }
     } catch (_) { /* sparkline is optional */ }
   }));
 }
@@ -364,11 +370,13 @@ async function loadDetail() {
   const unit = data.sensor?.unit || "";
   const pts = data.points || [];
   const last = pts.length ? pts[pts.length - 1] : null;
-  $("detail-current").textContent = last ? fmtValue(Number(last.v)) : "–";
-  $("detail-unit").textContent = unit;
+  const isRain = data.sensor?.sensorType === "RAIN";
+  $("detail-current").textContent = isRain ? fmtValue(data.stats?.sum ?? 0) : (last ? fmtValue(Number(last.v)) : "–");
+  $("detail-unit").textContent = isRain ? `${unit} im Zeitraum` : unit;
   $("chart").innerHTML = bigChart(pts, unit);
   $("stat-min").textContent = fmtValue(data.stats?.min);
-  $("stat-avg").textContent = fmtValue(data.stats?.avg);
+  $("stat-avg-label").textContent = isRain ? "Σ" : "Ø";
+  $("stat-avg").textContent = fmtValue(isRain ? data.stats?.sum : data.stats?.avg);
   $("stat-max").textContent = fmtValue(data.stats?.max);
   $("stat-count").textContent = data.stats?.count ?? "–";
 }
