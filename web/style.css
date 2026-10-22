@@ -245,6 +245,32 @@ main { padding: 16px; max-width: 640px; margin: 0 auto; }
   min-height: 220px;
 }
 .chart-box svg { width: 100%; height: auto; display: block; }
+
+/* Hover / touch read-out on charts */
+.chart-box, .sensor-spark-slot { position: relative; }
+.chart-guide { stroke: var(--text-muted); stroke-width: 1; stroke-dasharray: 3 3; visibility: hidden; }
+.chart-guide.visible { visibility: visible; }
+.chart-dot {
+  position: absolute;
+  width: 9px; height: 9px;
+  margin: -4.5px 0 0 -4.5px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--bg-card);
+  pointer-events: none;
+}
+.chart-tip {
+  position: absolute;
+  z-index: 2;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+}
 .chart-empty {
   display: grid;
   place-items: center;

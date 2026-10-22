@@ -140,32 +140,100 @@ function niceDomain(min, max) {
   return [min - pad, max + pad];
 }
 
-function sparkline(points) {
-  const W = 120, H = 34, PAD = 3;
-  if (!points || points.length < 2) return "";
+// Scales shared by chart rendering and hover lookup (viewBox units)
+function chartGeo(points, box) {
   const vals = points.map(p => Number(p.v));
   const [lo, hi] = niceDomain(Math.min(...vals), Math.max(...vals));
   const t0 = points[0].t, t1 = points[points.length - 1].t;
   const span = Math.max(t1 - t0, 1);
-  const x = t => PAD + ((t - t0) / span) * (W - 2 * PAD);
-  const y = v => H - PAD - ((v - lo) / (hi - lo)) * (H - 2 * PAD);
-  const d = points.map((p, i) => (i ? "L" : "M") + x(p.t).toFixed(1) + " " + y(Number(p.v)).toFixed(1)).join(" ");
-  return `<svg class="sensor-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+  const x = t => box.L + ((t - t0) / span) * (box.W - box.L - box.R);
+  const y = v => box.T + (1 - (v - lo) / (hi - lo)) * (box.H - box.T - box.B);
+  return { ...box, lo, hi, t0, t1, x, y };
+}
+
+const SPARK_BOX = { W: 120, H: 34, L: 3, R: 3, T: 3, B: 3 };
+const CHART_BOX = { W: 600, H: 240, L: 44, R: 12, T: 14, B: 26 };
+
+function sparkline(points, g) {
+  const d = points.map((p, i) => (i ? "L" : "M") + g.x(p.t).toFixed(1) + " " + g.y(Number(p.v)).toFixed(1)).join(" ");
+  return `<svg class="sensor-spark" viewBox="0 0 ${g.W} ${g.H}" preserveAspectRatio="none" aria-hidden="true">
     <path d="${d}" fill="none" stroke="var(--accent)" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>
   </svg>`;
 }
 
-function bigChart(points, unit) {
-  const W = 600, H = 240, L = 44, R = 12, T = 14, B = 26;
+function renderSparkline(slot, points, unit) {
+  if (!points || points.length < 2) { slot.innerHTML = ""; return; }
+  const g = chartGeo(points, SPARK_BOX);
+  slot.innerHTML = sparkline(points, g);
+  // Cards open the detail view on tap, so touch keeps that and only the mouse hovers
+  attachChartHover(slot, points, g, unit, { mouseOnly: true });
+}
+
+function renderBigChart(box, points, unit) {
+  if (!points || points.length === 0) { box.innerHTML = bigChart(points, unit); return; }
+  const g = chartGeo(points, CHART_BOX);
+  box.innerHTML = bigChart(points, unit, g);
+  attachChartHover(box, points, g, unit, { mouseOnly: false });
+}
+
+// Shows the nearest data point (guide line, dot, value + time) under mouse or finger
+function attachChartHover(container, points, g, unit, { mouseOnly }) {
+  const svg = container.querySelector("svg");
+  if (!svg) return;
+  const guide = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  guide.setAttribute("class", "chart-guide");
+  guide.setAttribute("y1", g.T);
+  guide.setAttribute("y2", g.H - g.B);
+  guide.setAttribute("vector-effect", "non-scaling-stroke");
+  svg.appendChild(guide);
+  const dot = el("div", "chart-dot hidden");
+  const tip = el("div", "chart-tip hidden");
+  container.append(dot, tip);
+  if (!mouseOnly) svg.style.touchAction = "pan-y";
+
+  const xs = points.map(p => g.x(p.t));
+  const hide = () => {
+    guide.classList.remove("visible");
+    dot.classList.add("hidden");
+    tip.classList.add("hidden");
+  };
+  const show = ev => {
+    if (mouseOnly && ev.pointerType !== "mouse") return;
+    const r = svg.getBoundingClientRect();
+    const vx = ((ev.clientX - r.left) / r.width) * g.W;
+    let a = 0, b = xs.length - 1;
+    while (b - a > 1) { const m = (a + b) >> 1; if (xs[m] < vx) a = m; else b = m; }
+    const i = Math.abs(xs[a] - vx) <= Math.abs(xs[b] - vx) ? a : b;
+    const p = points[i];
+
+    guide.setAttribute("x1", xs[i]);
+    guide.setAttribute("x2", xs[i]);
+    guide.classList.add("visible");
+
+    const c = container.getBoundingClientRect();
+    const px = r.left - c.left + (xs[i] / g.W) * r.width;
+    const py = r.top - c.top + (g.y(Number(p.v)) / g.H) * r.height;
+    dot.style.left = px + "px";
+    dot.style.top = py + "px";
+    dot.classList.remove("hidden");
+
+    tip.textContent = `${fmtValue(Number(p.v))}${unit ? " " + unit : ""} · ${fmtTime(p.t, true)}`;
+    tip.classList.remove("hidden");
+    const tw = tip.offsetWidth, th = tip.offsetHeight;
+    tip.style.left = Math.min(Math.max(px - tw / 2, 0), c.width - tw) + "px";
+    tip.style.top = (py - th - 10 >= 0 ? py - th - 10 : py + 10) + "px";
+  };
+  svg.addEventListener("pointermove", show);
+  svg.addEventListener("pointerdown", show);
+  svg.addEventListener("pointerleave", hide);
+  svg.addEventListener("pointercancel", hide);
+}
+
+function bigChart(points, unit, g) {
   if (!points || points.length === 0) {
     return '<div class="chart-empty">Keine Daten im gewählten Zeitraum</div>';
   }
-  const vals = points.map(p => Number(p.v));
-  const [lo, hi] = niceDomain(Math.min(...vals), Math.max(...vals));
-  const t0 = points[0].t, t1 = points[points.length - 1].t;
-  const span = Math.max(t1 - t0, 1);
-  const x = t => L + ((t - t0) / span) * (W - L - R);
-  const y = v => T + (1 - (v - lo) / (hi - lo)) * (H - T - B);
+  const { W, H, L, R, B, lo, hi, t0, t1, x, y } = g;
 
   const line = points.map((p, i) => (i ? "L" : "M") + x(p.t).toFixed(1) + " " + y(Number(p.v)).toFixed(1)).join(" ");
   const area = line + ` L ${x(t1).toFixed(1)} ${H - B} L ${x(t0).toFixed(1)} ${H - B} Z`;
@@ -293,7 +361,7 @@ async function loadDashboard() {
     try {
       const data = await api(`/api/measurements?sensorId=${s.id}&window=86400000&limit=500`);
       const slot = document.querySelector(`.sensor-card[data-id="${s.id}"] .sensor-spark-slot`);
-      if (slot) slot.innerHTML = sparkline(data.points);
+      if (slot) renderSparkline(slot, data.points, s.unit || "");
       // Rain arrives per report interval: the card shows the 24 h total instead
       if (s.sensorType === "RAIN") {
         const card = document.querySelector(`.sensor-card[data-id="${s.id}"]`);
@@ -373,7 +441,7 @@ async function loadDetail() {
   const isRain = data.sensor?.sensorType === "RAIN";
   $("detail-current").textContent = isRain ? fmtValue(data.stats?.sum ?? 0) : (last ? fmtValue(Number(last.v)) : "–");
   $("detail-unit").textContent = isRain ? `${unit} im Zeitraum` : unit;
-  $("chart").innerHTML = bigChart(pts, unit);
+  renderBigChart($("chart"), pts, unit);
   $("stat-min").textContent = fmtValue(data.stats?.min);
   $("stat-avg-label").textContent = isRain ? "Σ" : "Ø";
   $("stat-avg").textContent = fmtValue(isRain ? data.stats?.sum : data.stats?.avg);
