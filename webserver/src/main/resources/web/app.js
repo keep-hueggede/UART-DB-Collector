@@ -436,6 +436,13 @@ async function loadDetail() {
   const data = await api(`/api/measurements?sensorId=${id}&window=${state.rangeMs}&limit=2000`);
   if (state.currentSensorId !== id) return; // user navigated away
   const unit = data.sensor?.unit || "";
+  const cal = data.sensor?.calibration || { factor: 1, offset: 0 };
+  state.currentCalibration = cal;
+  const s = data.sensor;
+  const corrected = cal.factor !== 1 || cal.offset !== 0;
+  $("detail-sub").textContent = s
+    ? `${s.name || s.sensorType} · ${s.deviceName}` + (corrected ? ` · korrigiert (×${fmtValue(cal.factor, 4)} ${cal.offset < 0 ? "−" : "+"} ${fmtValue(Math.abs(cal.offset), 4)})` : "")
+    : "";
   const pts = data.points || [];
   const last = pts.length ? pts[pts.length - 1] : null;
   const isRain = data.sensor?.sensorType === "RAIN";
@@ -580,6 +587,42 @@ $("rename-form").addEventListener("submit", () => {
       });
       toast("Name gespeichert");
       await refresh();
+    } catch (err) {
+      if (!err.isAuth) toast(err.message, true);
+    }
+  }, 0);
+});
+
+/* ---------------------------------------------------------- calibration */
+
+const calDlg = $("calibration-dialog");
+
+$("btn-calibrate").addEventListener("click", () => {
+  const cal = state.currentCalibration || { factor: 1, offset: 0 };
+  $("cal-offset").value = cal.offset;
+  $("cal-factor").value = cal.factor;
+  calDlg.showModal();
+  $("cal-offset").select();
+});
+
+$("calibration-form").addEventListener("submit", () => {
+  setTimeout(async () => {
+    const id = state.currentSensorId;
+    if (id == null || (calDlg.returnValue !== "save" && calDlg.returnValue !== "reset")) return;
+    const reset = calDlg.returnValue === "reset";
+    const factor = reset ? 1 : Number($("cal-factor").value.replace(",", "."));
+    const offset = reset ? 0 : Number($("cal-offset").value.replace(",", "."));
+    if (!Number.isFinite(factor) || !Number.isFinite(offset)) {
+      toast("Bitte gültige Zahlen eingeben", true);
+      return;
+    }
+    try {
+      await api(`/api/sensors/${id}/calibration`, {
+        method: "PUT",
+        body: JSON.stringify({ factor, offset }),
+      });
+      toast(reset ? "Korrektur entfernt" : "Korrekturwerte gespeichert");
+      await loadDetail();
     } catch (err) {
       if (!err.isAuth) toast(err.message, true);
     }

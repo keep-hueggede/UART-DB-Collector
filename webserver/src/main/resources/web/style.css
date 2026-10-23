@@ -209,6 +209,8 @@ main { padding: 16px; max-width: 640px; margin: 0 auto; }
 .detail-head .sensor-icon svg { width: 22px; height: 22px; }
 .detail-head h2 { margin: 0; font-size: 18px; }
 .detail-head p { margin: 2px 0 0; font-size: 13px; }
+.detail-head > div { min-width: 0; }
+.detail-calibrate { margin-left: auto; flex: none; }
 
 .detail-value { margin: 18px 2px 14px; font-size: 44px; font-weight: 700; letter-spacing: -1px; }
 .detail-value .unit { font-size: 18px; font-weight: 500; color: var(--text-muted); margin-left: 6px; }

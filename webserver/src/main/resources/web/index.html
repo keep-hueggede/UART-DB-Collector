@@ -66,6 +66,9 @@
           <h2 id="detail-title">–</h2>
           <p id="detail-sub" class="muted">–</p>
         </div>
+        <button id="btn-calibrate" class="icon-btn detail-calibrate" aria-label="Korrekturwerte" title="Korrekturwerte">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>
+        </button>
       </div>
       <div class="detail-value">
         <span id="detail-current">–</span>
@@ -147,6 +150,23 @@
       <input id="rename-name" type="text" maxlength="40" required autocomplete="off">
       <p class="hint">Hardware-ID: <code id="rename-hwid">–</code></p>
       <div class="dialog-actions">
+        <button value="cancel" class="secondary" formnovalidate>Abbrechen</button>
+        <button value="save">Speichern</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="calibration-dialog">
+    <form method="dialog" id="calibration-form">
+      <h2>Korrekturwerte</h2>
+      <label for="cal-offset">Offset</label>
+      <input id="cal-offset" type="number" step="any" inputmode="decimal" required>
+      <label for="cal-factor">Faktor</label>
+      <input id="cal-factor" type="number" step="any" inputmode="decimal" required>
+      <p class="hint">Angezeigt wird <b>Rohwert × Faktor + Offset</b>. Misst der Sensor z.B. 1 °C zu viel:
+        Offset −1, Faktor 1. Gilt auch rückwirkend; die gespeicherten Rohwerte bleiben unverändert.</p>
+      <div class="dialog-actions">
+        <button value="reset" class="secondary" formnovalidate>Zurücksetzen</button>
         <button value="cancel" class="secondary" formnovalidate>Abbrechen</button>
         <button value="save">Speichern</button>
       </div>
