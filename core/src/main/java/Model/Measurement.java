@@ -1,7 +1,6 @@
 package Model;
 
 import jakarta.persistence.*;
-import org.hibernate.annotations.CreationTimestamp;
 
 import java.util.Date;
 
@@ -20,16 +19,21 @@ public class Measurement {
     @Column(name = "MeasurementValue")
     private Double value;
 
-    @CreationTimestamp
+    // Set by the caller (receive time), so buffered data keeps its original time
     @Temporal(TemporalType.TIMESTAMP)
-    @Column(name = "Timestamp")
+    @Column(name = "Timestamp", nullable = false)
     private Date timestamp;
 
     public Measurement() {}
 
     public Measurement(Sensor sensor, Double value) {
+        this(sensor, value, new Date());
+    }
+
+    public Measurement(Sensor sensor, Double value, Date timestamp) {
         this.sensor = sensor;
         this.value = value;
+        this.timestamp = timestamp;
     }
 
     public int getId() { return id; }
