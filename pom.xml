@@ -30,9 +30,9 @@
             <version>8.1.0</version>
         </dependency>
         <dependency>
-            <groupId>jsch</groupId>
+            <groupId>com.github.mwiede</groupId>
             <artifactId>jsch</artifactId>
-            <version>0.1.29</version>
+            <version>2.28.8</version>
         </dependency>
         <dependency>
             <groupId>com.h2database</groupId>
@@ -57,6 +57,13 @@
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
             <version>5.9.1</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.sshd</groupId>
+            <artifactId>sshd-core</artifactId>
+            <version>2.12.1</version>
             <scope>test</scope>
         </dependency>
 
