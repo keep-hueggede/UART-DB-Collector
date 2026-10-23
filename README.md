@@ -86,9 +86,9 @@ GOOGLE.REDIRECT_URI=    # API gesperrt (401) - siehe unten
 SSH.ENABLED=false       # true: MySQL auf einem Server via SSH-Tunnel
 ```
 
-Der Collector liest `./app.config` (im Entwicklungsbetrieb alternativ
-`./java/Controller/app.config`); fehlt beides, bricht der Start ab. Ohne
-`GOOGLE.CLIENT_ID`/`GOOGLE.CLIENT_SECRET` laeuft der Collector weiter, aber die
+Beide Jars lesen `./app.config` oder den als erstes Argument uebergebenen
+Pfad; fehlt die Datei, bricht der Start ab. Ohne
+`GOOGLE.CLIENT_ID`/`GOOGLE.CLIENT_SECRET` laeuft der Webserver, aber die
 Web-API bleibt gesperrt (401) und der Login-Button zeigt einen Hinweis.
 
 ## Datenbank
