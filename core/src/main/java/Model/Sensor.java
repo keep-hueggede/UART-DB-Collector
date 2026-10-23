@@ -29,6 +29,14 @@ public class Sensor {
     @Column(name = "Unit")
     private String unit;
 
+    // Display correction: shown = raw * factor + offset; stored values stay raw.
+    // NULL (rows from before this column existed) means no correction.
+    @Column(name = "CalibrationFactor")
+    private Double calibrationFactor;
+
+    @Column(name = "CalibrationOffset")
+    private Double calibrationOffset;
+
     @OneToMany(mappedBy = "sensor", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Measurement> measurements = new ArrayList<>();
 
@@ -70,6 +78,12 @@ public class Sensor {
     public void setName(String name) { this.name = name; }
     public String getUnit() { return unit; }
     public void setUnit(String unit) { this.unit = unit; }
+    public double getCalibrationFactor() { return calibrationFactor == null ? 1.0 : calibrationFactor; }
+    public double getCalibrationOffset() { return calibrationOffset == null ? 0.0 : calibrationOffset; }
+    public void setCalibration(double factor, double offset) {
+        this.calibrationFactor = factor;
+        this.calibrationOffset = offset;
+    }
     public List<Measurement> getMeasurements() { return measurements; }
     public Date getCreatedAt() { return createdAt; }
 
