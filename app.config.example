@@ -1,9 +1,17 @@
 # UART-DB-Collector Konfiguration
-# Kopieren nach ./app.config und anpassen.
+# Kopieren nach ./app.config und anpassen. Beide Jars lesen dieselbe Datei
+# und ignorieren fremde Schluessel:
+#   uart-db-collector.jar (Pi):    UART.*, BUFFER.*, DB.*, SSH.*
+#   uart-db-webserver.jar (Server): SERVER.*, GOOGLE.*, DB.* (SSH.* optional)
 
-# === UART (ESP-C6 ThreadReceiver -> Pi) ===
+# === UART (ESP-C6 ThreadReceiver -> Pi) - nur Collector ===
 UART.PORTNAME=/dev/serial0
 UART.BAUD=115200
+
+# === Lokaler Puffer - nur Collector ===
+# Ist die Datenbank nicht erreichbar, landen die UART-Zeilen hier und werden
+# spaeter mit ihrer Empfangszeit nachgetragen (Neuversuch alle 30 s).
+BUFFER.FILE=./spool/pending.log
 
 # === Datenbank ===
 # DB.DRIVER=h2:    lokale Datei ./data/<DB.NAME>.mv.db
@@ -18,8 +26,10 @@ DB.PASSWORD=
 #   useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
 DB.PARAMS=
 
-# === Web-Server / Phone-App ===
+# === Web-Server / Phone-App - nur Webserver ===
 # Bindet standardmaessig auf alle Interfaces -> im LAN vom Phone erreichbar.
+# Im Internet: SERVER.HOST=127.0.0.1 hinter einem Reverse-Proxy mit HTTPS
+# und SERVER.SECURE_COOKIE=true.
 SERVER.ENABLED=true
 SERVER.HOST=0.0.0.0
 SERVER.PORT=8080
