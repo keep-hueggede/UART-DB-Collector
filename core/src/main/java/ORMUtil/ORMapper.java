@@ -18,7 +18,7 @@ import java.util.function.Function;
 public class ORMapper extends CommonDbConnector {
 
     private Session session;
-    private SessionFactory sessionFactory;
+    private volatile SessionFactory sessionFactory;
     private Configuration conf;
     private String driverClass;
     private String urlPrefix;
@@ -71,8 +71,29 @@ public class ORMapper extends CommonDbConnector {
     }
 
     public void disconnect() {
-        if (this.session != null) this.session.close();
+        try {
+            if (this.session != null) this.session.close();
+        } catch (RuntimeException ignored) {
+            // session of a dead connection
+        }
         if (this.sessionFactory != null) this.sessionFactory.close();
+        this.session = null;
+        this.sessionFactory = null;
+    }
+
+    /** Drop the (possibly dead) connection pool and session and build new ones. */
+    public void reconnect() {
+        disconnect();
+        connect();
+    }
+
+    /** True if the database answers on a fresh connection. */
+    public boolean ping() {
+        try {
+            return readInSession(s -> s.doReturningWork(c -> c.isValid(5)));
+        } catch (RuntimeException ex) {
+            return false;
+        }
     }
 
     public void persist(Object ent) {
