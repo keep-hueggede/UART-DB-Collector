@@ -56,7 +56,16 @@ final class Ownership {
         m.put("unit", s.getUnit());
         m.put("deviceId", s.getDevice().getId());
         m.put("deviceName", s.getDevice().getName());
+        Map<String, Object> cal = new LinkedHashMap<>();
+        cal.put("factor", s.getCalibrationFactor());
+        cal.put("offset", s.getCalibrationOffset());
+        m.put("calibration", cal);
         return m;
+    }
+
+    /** Value as displayed: raw * factor + offset (raw stays untouched in the database). */
+    static Double corrected(Sensor s, Double raw) {
+        return raw == null ? null : raw * s.getCalibrationFactor() + s.getCalibrationOffset();
     }
 
     static Long toMillis(Date date) {

@@ -19,6 +19,10 @@ public class MeasurementRepository {
         this.mapper = mapper;
     }
 
+    private static double round3(double v) {
+        return Math.round(v * 1000.0) / 1000.0;
+    }
+
     /** Latest measurement per owned sensor, including sensor + device metadata. */
     public List<Map<String, Object>> latest(int userId) {
         return mapper.readInSession(session -> {
@@ -37,7 +41,8 @@ public class MeasurementRepository {
                 m.put("name", s.getName());
                 m.put("unit", s.getUnit());
                 m.put("deviceName", s.getDevice().getName());
-                m.put("value", latest == null ? null : latest.getValue());
+                m.put("value", latest == null ? null : Ownership.corrected(s, latest.getValue()));
+                m.put("rawValue", latest == null ? null : latest.getValue());
                 m.put("timestamp", latest == null ? null : Ownership.toMillis(latest.getTimestamp()));
                 out.add(m);
             }
@@ -54,6 +59,8 @@ public class MeasurementRepository {
     public Map<String, Object> series(int userId, int sensorId, Long from, Long to, int limit) {
         return mapper.readInSession(session -> {
             if (!Ownership.ownsSensor(session, userId, sensorId)) return null;
+            Sensor sensor = session.get(Sensor.class, sensorId);
+            if (sensor == null) return null;
 
             String range = "";
             if (from != null) range += " AND m.timestamp >= :from";
@@ -68,15 +75,19 @@ public class MeasurementRepository {
             if (to != null) statsQuery.setParameter("to", new Date(to));
             Object[] stats = statsQuery.getSingleResult();
 
+            // The correction is linear, so the raw statistics convert exactly;
+            // a negative factor swaps min and max
+            double f = sensor.getCalibrationFactor(), o = sensor.getCalibrationOffset();
+            long count = stats[3] == null ? 0L : ((Number) stats[3]).longValue();
+            Double lo = stats[0] == null ? null : ((Number) stats[0]).doubleValue() * f + o;
+            Double hi = stats[1] == null ? null : ((Number) stats[1]).doubleValue() * f + o;
             Map<String, Object> statsMap = new LinkedHashMap<>();
-            statsMap.put("count", stats[3] == null ? 0L : ((Number) stats[3]).longValue());
-            statsMap.put("min", stats[0]);
-            statsMap.put("max", stats[1]);
-            statsMap.put("avg", stats[2] == null ? null
-                    : Math.round(((Number) stats[2]).doubleValue() * 1000.0) / 1000.0);
+            statsMap.put("count", count);
+            statsMap.put("min", f < 0 ? hi : lo);
+            statsMap.put("max", f < 0 ? lo : hi);
+            statsMap.put("avg", stats[2] == null ? null : round3(((Number) stats[2]).doubleValue() * f + o));
             // Meaningful for per-interval values such as rain
-            statsMap.put("sum", stats[4] == null ? 0.0
-                    : Math.round(((Number) stats[4]).doubleValue() * 1000.0) / 1000.0);
+            statsMap.put("sum", stats[4] == null ? 0.0 : round3(((Number) stats[4]).doubleValue() * f + o * count));
 
             var pointQuery = session.createQuery(
                             "FROM Measurement m WHERE m.sensor.id = :sid" + range
@@ -91,7 +102,7 @@ public class MeasurementRepository {
             for (Measurement m : measurements) {
                 Map<String, Object> p = new LinkedHashMap<>();
                 p.put("t", Ownership.toMillis(m.getTimestamp()));
-                p.put("v", m.getValue());
+                p.put("v", Ownership.corrected(sensor, m.getValue()));
                 points.add(p);
             }
 
