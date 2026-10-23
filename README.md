@@ -6,8 +6,13 @@ Hibernate in einer H2-Datenbank oder in einer MySQL-Datenbank auf einem Server
 
 ## Funktionen
 
+* Zwei getrennt lauffaehige Programme (Maven-Module):
+  `uart-db-collector.jar` auf dem Pi, `uart-db-webserver.jar` auf einem Server
 * UART-Empfang (newline-delimited JSON) und Speicherung je Sensor
 * Lokale H2-Datei oder MySQL - direkt oder durch einen SSH-Tunnel
+* Lokaler Puffer auf dem Pi: ist die Datenbank nicht erreichbar, werden die
+  Daten zwischengespeichert und mit Empfangszeit nachgetragen; der SSH-Tunnel
+  verbindet sich selbststaendig neu
 * Web-App (PWA) mit Google-Login, Verlaufscharts und Auto-Aktualisierung
 * Gerateverwaltung: eigene Feldgerate verknuepfen, umbenennen, Verknuepfung loesen
 * Daten werden pro Nutzer gefiltert (Edge-Devices schreiben weiterhin alles)
@@ -23,16 +28,28 @@ Hibernate in einer H2-Datenbank oder in einer MySQL-Datenbank auf einem Server
 
 ## Build & Start
 
+Das Projekt ist ein Maven-Multi-Modul-Projekt (vergleichbar mit einer
+C#-Solution): das Root-`pom.xml` baut alle Module.
+
 ```bash
-mvn package
-java -jar target/UART-DB-Collector-1.0-SNAPSHOT.jar
+mvn package                           # alles bauen + testen
+mvn -pl collector -am package         # nur Collector (+ core)
+mvn -pl webserver -am package         # nur Webserver (+ core)
+
+java -jar collector/target/uart-db-collector.jar    # Pi: UART -> DB
+java -jar webserver/target/uart-db-webserver.jar    # Server: Web-App + API
 ```
 
-Tests:
+Beide lesen `./app.config` im Arbeitsverzeichnis (oder den Pfad als erstes
+Argument). Tests:
 
 ```bash
 mvn test
 ```
+
+Die GitHub Action (`.github/workflows/maven.yml`) baut bei jedem Push/PR auf
+`main` alle Module, fuehrt die Tests aus und stellt Testberichte und beide Jars
+als Artefakte bereit.
 
 Die Tests laufen ohne externe Infrastruktur: HTTP-Server und SSH-Server werden
 im Testprozess gestartet. Nur `Test_MySQLConnector` und `Test_UARTCom` sind
@@ -290,24 +307,57 @@ systemctl --user daemon-reload
 systemctl --user enable --now uart-db-collector
 ```
 
-Das Jar erwartet `app.config` im Arbeitsverzeichnis (`WorkingDirectory=%h/app`
-im Dienst), also `app.jar` und `app.config` nach `~/app/` kopieren. Es laeuft
-mit `Restart=always` - das ist auch der empfohlene Neustart-Mechanismus, falls
-die SSH-Verbindung zur Remote-DB abbrechen sollte. Logs:
+Der Dienst erwartet `uart-db-collector.jar` und `app.config` in `~/app/`
+(`WorkingDirectory=%h/app`). Faellt die Datenbank oder der SSH-Tunnel aus,
+laeuft der Collector weiter: UART-Zeilen landen in `./spool/pending.log` und
+werden alle 30 s nachgetragen, sobald die Verbindung wieder steht. Logs:
 `tail -f ~/app/collector.log`.
+
+## Getrennter Betrieb: Collector auf dem Pi, Web-App im Internet
+
+```
+ESP32-C6 --UART--> Pi: uart-db-collector.jar --SSH-Tunnel--> Server: MySQL (127.0.0.1)
+                                                               ^
+                        Browser --HTTPS--> Reverse-Proxy --> uart-db-webserver.jar
+```
+
+* Die Verbindung geht nur **vom Pi nach aussen** (SSH) - am Heimrouter wird
+  kein Port freigegeben, MySQL lauscht auf dem Server nur auf 127.0.0.1.
+* **Pi** (`app.config`): `DB.DRIVER=mysql`, `SSH.ENABLED=true` (siehe
+  Abschnitt SSH-Tunnel). Fuer den SSH-Nutzer auf dem Server genuegt reines
+  Port-Forwarding, z.B. in `authorized_keys`:
+  `restrict,port-forwarding,permitopen="127.0.0.1:3306" ssh-ed25519 AAAA...`
+* **Server** (`app.config`): `DB.DRIVER=mysql`, `DB.HOST=127.0.0.1`,
+  `SERVER.HOST=127.0.0.1`, `SERVER.SECURE_COOKIE=true`,
+  `GOOGLE.REDIRECT_URI=https://<domain>/auth/callback`. Dienst:
+  `deploy/uart-db-webserver.service` (Systemdienst unter eigenem Nutzer).
+* **Reverse-Proxy mit HTTPS**, z.B. Caddy (holt das Zertifikat selbst):
+
+  ```
+  wetter.example.org {
+      reverse_proxy 127.0.0.1:8080
+  }
+  ```
+
+Beide Programme legen das Schema per Hibernate an bzw. aktualisieren es -
+deshalb immer **beide Jars aus demselben Stand** ausrollen.
 
 ## Projektstruktur
 
 ```
-java/Controller/   Start, Konfiguration, UART-Parsing, Persistenz-Fluss
-java/UARTCom/      Serielle Schnittstelle + Listener
-java/WebServer/    HTTP-Server, Auth (Google/Sessions), REST-API, DB-Zugriffe
-java/SSHTunnel/    SSH-Tunnel (lokales Port-Forwarding) + Konfiguration
-java/ORMUtil/      Hibernate/ORMapper
-java/Model/        Entities (Device, Sensor, Measurement, UserAccount, ...)
-java/DBConnector/  Datenbank-Basisklassen (JDBC)
-web/               PWA (HTML/CSS/JS, Service Worker, Icons)
-test/              JUnit-Tests (H2, HTTP-Server, SSH-Server im Testprozess)
-deploy/            systemd-Unit
-data/              H2-Dateien (wird zur Laufzeit angelegt)
+pom.xml                      Parent ("Solution"): Module + Versionen
+core/                        gemeinsame Bibliothek
+  src/main/java/Model/         Entities (Device, Sensor, Measurement, UserAccount, ...)
+  src/main/java/ORMUtil/       Hibernate/ORMapper, DatabaseSetup (Config, DB, Tunnel)
+  src/main/java/SSHTunnel/     SSH-Tunnel (lokales Port-Forwarding) + Konfiguration
+  src/main/java/DBConnector/   Datenbank-Basisklassen (JDBC)
+collector/                   -> uart-db-collector.jar (Pi)
+  src/main/java/Controller/    Start, UART-Parsing, Ingestor (Speichern), Spool (Puffer)
+  src/main/java/UARTCom/       Serielle Schnittstelle + Listener
+webserver/                   -> uart-db-webserver.jar (Server)
+  src/main/java/WebServer/     HTTP-Server, Auth (Google/Sessions), REST-API, WebMain
+  src/main/resources/web/      PWA (HTML/CSS/JS, Service Worker, Icons)
+*/src/test/java/             JUnit-Tests (H2, HTTP-Server, SSH-Server im Testprozess)
+deploy/                      systemd-Units (Collector, Webserver)
+.github/workflows/           CI: Build + Tests aller Module
 ```
