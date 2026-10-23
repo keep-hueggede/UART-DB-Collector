@@ -8,6 +8,8 @@ import Model.UserAccount;
 import Model.UserDevice;
 import Listener.IObserverListener;
 import ORMUtil.ORMapper;
+import SSHTunnel.SSHTunnel;
+import SSHTunnel.SSHTunnelConfig;
 import UARTCom.UARTCom;
 import WebServer.DbReader;
 import WebServer.GoogleAuth;
@@ -27,6 +29,7 @@ public class Controller implements IObserverListener {
 
     private UARTCom com;
     private ORMapper mapper;
+    private SSHTunnel tunnel;
     private WebServer webServer;
     private final ObjectMapper jsonMapper = new ObjectMapper();
 
@@ -45,14 +48,26 @@ public class Controller implements IObserverListener {
             }
             this.prop.load(new FileInputStream(configPath.toFile()));
 
-            String dbDriver = prop.getProperty("DB.DRIVER", "h2");
-            String dbHost = prop.getProperty("DB.HOST", "localhost");
-            int dbPort = Integer.parseInt(prop.getProperty("DB.PORT", "3306"));
-            String dbName = prop.getProperty("DB.NAME", "wetter");
+            String dbDriver = prop.getProperty("DB.DRIVER", "h2").trim();
+            String dbHost = prop.getProperty("DB.HOST", "localhost").trim();
+            int dbPort = Integer.parseInt(prop.getProperty("DB.PORT", "3306").trim());
+            String dbName = prop.getProperty("DB.NAME", "wetter").trim();
             String dbUser = prop.getProperty("DB.USER", "sa");
             String dbPass = prop.getProperty("DB.PASSWORD", "");
+            String dbParams = prop.getProperty("DB.PARAMS", "");
 
-            this.mapper = new ORMapper(dbHost, dbPort, dbName, dbUser, dbPass, dbDriver,
+            SSHTunnelConfig sshConfig = SSHTunnelConfig.from(this.prop);
+            if (sshConfig.enabled) {
+                if (!"mysql".equalsIgnoreCase(dbDriver)) {
+                    throw new IllegalArgumentException("SSH.ENABLED=true erfordert DB.DRIVER=mysql"
+                            + " (aktuell: " + dbDriver + ")");
+                }
+                this.tunnel = new SSHTunnel(sshConfig);
+                dbPort = this.tunnel.start();
+                dbHost = "127.0.0.1";
+            }
+
+            this.mapper = new ORMapper(dbHost, dbPort, dbName, dbUser, dbPass, dbDriver, dbParams,
                     List.of(Device.class, Sensor.class, Measurement.class, Actuator.class,
                             UserAccount.class, UserDevice.class));
             this.mapper.connect();
@@ -92,6 +107,7 @@ public class Controller implements IObserverListener {
 
         } catch (Exception ex) {
             // Fail fast instead of running half-initialised (NPE later on)
+            if (this.tunnel != null) this.tunnel.stop();
             throw new IllegalStateException("UART-DB-Collector startup failed: " + ex.getMessage(), ex);
         }
     }
@@ -105,6 +121,7 @@ public class Controller implements IObserverListener {
         if (this.webServer != null) this.webServer.stop();
         this.com.close();
         this.mapper.disconnect();
+        if (this.tunnel != null) this.tunnel.stop();
         System.out.println("UART-DB-Collector beendet.");
     }
 

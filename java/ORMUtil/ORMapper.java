@@ -25,6 +25,11 @@ public class ORMapper extends CommonDbConnector {
 
     public ORMapper(String _host, Integer _port, String _database, String _user, String _password,
                     String _driver, List<Class> _annotations) {
+        this(_host, _port, _database, _user, _password, _driver, "", _annotations);
+    }
+
+    public ORMapper(String _host, Integer _port, String _database, String _user, String _password,
+                    String _driver, String _params, List<Class> _annotations) {
         super(_host, _port, _database, _user, _password);
 
         this.conf = new Configuration();
@@ -36,7 +41,8 @@ public class ORMapper extends CommonDbConnector {
         } else {
             this.driverClass = "com.mysql.cj.jdbc.Driver";
             this.urlPrefix = "jdbc:mysql://" + this.host + ":" + this.port
-                    + (!this.database.isEmpty() ? "/" + this.database : "");
+                    + (!this.database.isEmpty() ? "/" + this.database : "")
+                    + normalizeParams(_params);
         }
 
         Properties settings = new Properties();
@@ -188,6 +194,13 @@ public class ORMapper extends CommonDbConnector {
     @Override
     protected String buildConnectionString(Boolean toDatabase) {
         return this.urlPrefix;
+    }
+
+    private static String normalizeParams(String params) {
+        if (params == null) return "";
+        String p = params.trim();
+        if (p.isEmpty()) return "";
+        return p.startsWith("?") ? p : "?" + p;
     }
 
     public Boolean isConnected() {
