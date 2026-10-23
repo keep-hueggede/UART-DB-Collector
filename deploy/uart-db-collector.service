@@ -1,4 +1,4 @@
-# systemd user service for the UART-DB-Collector on the Raspberry Pi.
+# systemd user service for the collector (collector/target/uart-db-collector.jar) on the Raspberry Pi.
 # Install (no root needed):
 #   mkdir -p ~/.config/systemd/user
 #   cp uart-db-collector.service ~/.config/systemd/user/
@@ -8,7 +8,7 @@
 # Logs: tail -f ~/app/collector.log
 
 [Unit]
-Description=UART-DB-Collector (ESP32-C6 Thread receiver -> H2/MySQL)
+Description=UART-DB-Collector (ESP32-C6 Thread receiver -> H2/MySQL, buffers while offline)
 After=default.target
 StartLimitIntervalSec=0
 
@@ -18,7 +18,7 @@ WorkingDirectory=%h/app
 # The Pi has no RTC: wait (max. 2 min) for NTP so measurements get correct timestamps
 ExecStartPre=/bin/sh -c 'for i in $(seq 60); do [ "$(timedatectl show -p NTPSynchronized --value)" = yes ] && exit 0; sleep 2; done; exit 0'
 TimeoutStartSec=180
-ExecStart=/usr/bin/java -jar %h/app/app.jar
+ExecStart=/usr/bin/java -jar %h/app/uart-db-collector.jar
 Restart=always
 RestartSec=10
 SuccessExitStatus=143

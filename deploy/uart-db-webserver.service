@@ -1,0 +1,33 @@
+# systemd system service for the web server (webserver/target/uart-db-webserver.jar)
+# on an internet server, behind a reverse proxy with HTTPS (e.g. Caddy or nginx).
+# Install (as root):
+#   useradd --system --home /opt/uart-db --shell /usr/sbin/nologin uartdb
+#   mkdir -p /opt/uart-db && cp uart-db-webserver.jar app.config /opt/uart-db/
+#   chown -R uartdb: /opt/uart-db && chmod 600 /opt/uart-db/app.config
+#   cp uart-db-webserver.service /etc/systemd/system/
+#   systemctl daemon-reload && systemctl enable --now uart-db-webserver
+# Logs: journalctl -u uart-db-webserver -f
+
+[Unit]
+Description=UART-DB-Webserver (REST API, Google login, PWA)
+After=network-online.target mysql.service mariadb.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=uartdb
+WorkingDirectory=/opt/uart-db
+ExecStart=/usr/bin/java -jar /opt/uart-db/uart-db-webserver.jar
+Restart=always
+RestartSec=10
+SuccessExitStatus=143
+
+# Hardening: read-only system, no privilege escalation
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/uart-db
+
+[Install]
+WantedBy=multi-user.target
