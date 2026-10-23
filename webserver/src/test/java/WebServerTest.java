@@ -5,7 +5,7 @@ import Model.Sensor;
 import Model.UserAccount;
 import Model.UserDevice;
 import ORMUtil.ORMapper;
-import WebServer.DbReader;
+import Repository.Repositories;
 import WebServer.GoogleAuth;
 import WebServer.SessionManager;
 import WebServer.WebServer;
@@ -51,7 +51,7 @@ public class WebServerTest {
         this.sessions = new SessionManager();
         // Google not configured in tests -> flow endpoints must degrade safely
         GoogleAuth google = new GoogleAuth("", "", "");
-        this.server = new WebServer(new DbReader(this.mapper), sessions, google,
+        this.server = new WebServer(Repositories.of(this.mapper), sessions, google,
                 "127.0.0.1", 0, "./does-not-exist", false);
         this.server.start();
         this.base = "http://127.0.0.1:" + this.server.getPort();

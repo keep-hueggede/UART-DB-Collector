@@ -2,6 +2,7 @@ package WebServer;
 
 import ORMUtil.DatabaseSetup;
 import ORMUtil.ORMapper;
+import Repository.Repositories;
 
 import java.util.Properties;
 
@@ -26,7 +27,7 @@ public class WebMain {
                     prop.getProperty("GOOGLE.CLIENT_SECRET", ""),
                     prop.getProperty("GOOGLE.REDIRECT_URI", ""));
 
-            webServer = new WebServer(new DbReader(mapper), new SessionManager(), google,
+            webServer = new WebServer(Repositories.of(mapper), new SessionManager(), google,
                     host, port, webRoot, secureCookie);
             webServer.start();
 

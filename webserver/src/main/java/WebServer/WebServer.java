@@ -1,5 +1,6 @@
 package WebServer;
 
+import Repository.Repositories;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
@@ -59,7 +60,7 @@ public class WebServer {
         put("woff2", "font/woff2");
     }};
 
-    private final DbReader db;
+    private final Repositories repos;
     private final SessionManager sessions;
     private final GoogleAuth google;
     private final String host;
@@ -72,9 +73,9 @@ public class WebServer {
 
     private HttpServer server;
 
-    public WebServer(DbReader db, SessionManager sessions, GoogleAuth google,
+    public WebServer(Repositories repos, SessionManager sessions, GoogleAuth google,
                      String host, int port, String webRoot, boolean secureCookie) {
-        this.db = db;
+        this.repos = repos;
         this.sessions = sessions;
         this.google = google;
         this.host = host;
@@ -182,7 +183,7 @@ public class WebServer {
             String redirectUri = google.redirectUri(
                     currentScheme(ex), ex.getRequestHeaders().getFirst("Host"));
             GoogleAuth.GoogleUser gu = google.exchangeCode(code, redirectUri);
-            var user = db.loginOrCreateUser(gu.sub, gu.email, gu.name, gu.pictureUrl);
+            var user = repos.users().loginOrCreate(gu.sub, gu.email, gu.name, gu.pictureUrl);
             String token = sessions.create(user);
 
             ex.getResponseHeaders().add("Set-Cookie",
@@ -225,7 +226,7 @@ public class WebServer {
         // public endpoint: liveness only, no data
         if (path.equals("/api/health")) {
             try {
-                sendJson(ex, 200, db.health());
+                sendJson(ex, 200, health());
             } catch (Exception e) {
                 e.printStackTrace();
                 sendError(ex, 500, "internal error");
@@ -273,7 +274,7 @@ public class WebServer {
 
         } else if (path.equals("/api/devices")) {
             if (method.equals("GET")) {
-                sendJson(ex, 200, db.devices(user.userId));
+                sendJson(ex, 200, repos.devices().listLinked(user.userId));
             } else if (method.equals("POST")) {
                 JsonNode body = readJsonBody(ex);
                 Integer deviceId = body != null && body.hasNonNull("deviceId")
@@ -284,7 +285,7 @@ public class WebServer {
                     sendError(ex, 400, "deviceId or name required");
                     return;
                 }
-                Map<String, Object> device = db.linkDevice(user.userId, deviceId, name);
+                Map<String, Object> device = repos.devices().link(user.userId, deviceId, name);
                 if (device == null) {
                     sendError(ex, 404, "device not found");
                     return;
@@ -296,21 +297,21 @@ public class WebServer {
 
         } else if (path.equals("/api/devices/available")) {
             if (!method.equals("GET")) { sendError(ex, 405, "method not allowed"); return; }
-            sendJson(ex, 200, db.availableDevices(user.userId));
+            sendJson(ex, 200, repos.devices().listAvailable(user.userId));
 
         } else if (path.startsWith("/api/devices/") && path.endsWith("/link")) {
             // explicit alias: POST /api/devices/{id}/link
             if (!method.equals("POST")) { sendError(ex, 405, "method not allowed"); return; }
             Integer id = parseIdOrNull(path.substring("/api/devices/".length(), path.length() - "/link".length()));
             if (id == null) { sendError(ex, 404, "not found"); return; }
-            Map<String, Object> device = db.linkDevice(user.userId, id, null);
+            Map<String, Object> device = repos.devices().link(user.userId, id, null);
             if (device == null) { sendError(ex, 404, "device not found"); return; }
             sendJson(ex, 200, device);
 
         } else if (path.startsWith("/api/devices/") && method.equals("DELETE")) {
             Integer id = parseIdOrNull(path.substring("/api/devices/".length()));
             if (id == null) { sendError(ex, 404, "not found"); return; }
-            boolean removed = db.unlinkDevice(user.userId, id);
+            boolean removed = repos.devices().unlink(user.userId, id);
             sendJson(ex, 200, Map.of("unlinked", removed));
 
         } else if (path.startsWith("/api/devices/") && method.equals("PUT")) {
@@ -323,20 +324,20 @@ public class WebServer {
 
         } else if (path.equals("/api/sensors")) {
             if (!method.equals("GET")) { sendError(ex, 405, "method not allowed"); return; }
-            sendJson(ex, 200, db.sensors(user.userId));
+            sendJson(ex, 200, repos.sensors().listLinked(user.userId));
 
         } else if (path.startsWith("/api/sensors/")) {
             if (!method.equals("GET")) { sendError(ex, 405, "method not allowed"); return; }
             Integer id = parseIdOrNull(path.substring("/api/sensors/".length()));
             if (id == null) { sendError(ex, 404, "not found"); return; }
-            Map<String, Object> sensor = db.sensor(user.userId, id);
+            Map<String, Object> sensor = repos.sensors().findLinked(user.userId, id);
             // unowned ids answer like missing ones -> no enumeration
             if (sensor == null) { sendError(ex, 404, "not found"); return; }
             sendJson(ex, 200, sensor);
 
         } else if (path.equals("/api/measurements/latest")) {
             if (!method.equals("GET")) { sendError(ex, 405, "method not allowed"); return; }
-            sendJson(ex, 200, db.latestMeasurements(user.userId));
+            sendJson(ex, 200, repos.measurements().latest(user.userId));
 
         } else if (path.equals("/api/measurements")) {
             if (!method.equals("GET")) { sendError(ex, 405, "method not allowed"); return; }
@@ -361,12 +362,12 @@ public class WebServer {
                     return;
                 }
             }
-            Map<String, Object> out = db.measurements(user.userId, sid, from, to, limit);
+            Map<String, Object> out = repos.measurements().series(user.userId, sid, from, to, limit);
             if (out == null) {
                 sendError(ex, 404, "not found");
                 return;
             }
-            out.put("sensor", db.sensor(user.userId, sid));
+            out.put("sensor", repos.sensors().findLinked(user.userId, sid));
             sendJson(ex, 200, out);
 
         } else {
@@ -401,7 +402,7 @@ public class WebServer {
                     + " characters without control characters");
             return;
         }
-        switch (db.renameDevice(user.userId, id, name)) {
+        switch (repos.devices().rename(user.userId, id, name)) {
             case NOT_FOUND -> sendError(ex, 404, "device not found");
             case NAME_TAKEN -> sendError(ex, 409, "name already in use");
             default -> {
@@ -466,6 +467,14 @@ public class WebServer {
     }
 
     // -------------------------------------------------------------- helpers
+
+    private Map<String, Object> health() {
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("status", "ok");
+        out.put("devices", repos.devices().count());
+        out.put("time", System.currentTimeMillis());
+        return out;
+    }
 
     private void redirect(HttpExchange ex, String location) throws IOException {
         ex.getResponseHeaders().add("Location", location);
