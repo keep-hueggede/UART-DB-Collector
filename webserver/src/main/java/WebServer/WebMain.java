@@ -15,7 +15,7 @@ public class WebMain {
         WebServer webServer;
         try {
             ORMapper mapper = db.createMapper();
-            mapper.connect();
+            db.connect();
 
             String host = prop.getProperty("SERVER.HOST", "0.0.0.0");
             int port = Integer.parseInt(prop.getProperty("SERVER.PORT", "8080"));

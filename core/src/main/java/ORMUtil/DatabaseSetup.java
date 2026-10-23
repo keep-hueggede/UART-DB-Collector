@@ -11,6 +11,8 @@ import SSHTunnel.SSHTunnelConfig;
 
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.ServerSocket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -66,23 +68,42 @@ public final class DatabaseSetup {
     }
 
     /**
-     * Creates the ORMapper (tunnel first, if enabled) without connecting it.
-     * The tunnel keeps its local port for reconnects, so the JDBC URL stays valid.
+     * Creates the ORMapper without connecting. With SSH the local tunnel port is
+     * fixed here, so the JDBC URL stays valid even if the tunnel comes up later.
      */
-    public ORMapper createMapper() {
+    public ORMapper createMapper() throws IOException {
         String dbHost = host;
         int dbPort = port;
         if (sshConfig.enabled) {
+            if (sshConfig.localPort == 0) sshConfig.localPort = freeLocalPort();
             this.tunnel = new SSHTunnel(sshConfig);
-            dbPort = this.tunnel.start();
             dbHost = "127.0.0.1";
+            dbPort = sshConfig.localPort;
         }
         this.mapper = new ORMapper(dbHost, dbPort, name, user, password, driver, params, ENTITIES);
         return this.mapper;
     }
 
-    public SSHTunnel getTunnel() {
-        return tunnel;
+    /** Starts the tunnel (if any) and connects the mapper; throws if unreachable. */
+    public void connect() {
+        if (tunnel != null) tunnel.start();
+        mapper.connect();
+    }
+
+    /** Restores a lost tunnel and replaces the mapper's connection pool. */
+    public void reconnect() {
+        if (tunnel != null && !tunnel.isRunning()) tunnel.start();
+        mapper.reconnect();
+    }
+
+    public boolean tunnelLost() {
+        return tunnel != null && !tunnel.isRunning();
+    }
+
+    private static int freeLocalPort() throws IOException {
+        try (ServerSocket s = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
+            return s.getLocalPort();
+        }
     }
 
     public String describe() {

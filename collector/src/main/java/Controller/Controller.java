@@ -1,29 +1,43 @@
 package Controller;
 
-import Model.Device;
-import Model.Measurement;
 import Model.Sensor;
 import Listener.IObserverListener;
 import ORMUtil.DatabaseSetup;
 import ORMUtil.ORMapper;
 import UARTCom.UARTCom;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class Controller implements IObserverListener {
 
+    private static final int RETRY_S = 30;
+    private static final int LOG_EVERY_N_FAILURES = 20;   // ~10 min at RETRY_S
+
     private UARTCom com;
-    private ORMapper mapper;
     private DatabaseSetup db;
-    private final ObjectMapper jsonMapper = new ObjectMapper();
+    private Ingestor ingestor;
+    // All database work runs on this single thread (Hibernate session is not thread-safe)
+    private final ScheduledExecutorService worker = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "db-writer");
+        t.setDaemon(false);
+        return t;
+    });
+    private int reconnectFailures = 0;
 
     public Controller(Properties prop) {
         try {
             this.db = new DatabaseSetup(prop);
-            this.mapper = this.db.createMapper();
-            this.mapper.connect();
+            ORMapper mapper = this.db.createMapper();
+            Spool spool = new Spool(Path.of(prop.getProperty("BUFFER.FILE", "./spool/pending.log")));
+
+            // An unreachable database must not stop UART reception: start anyway and buffer
+            boolean dbOk = tryConnect();
+            this.ingestor = new Ingestor(mapper, spool, this::reconnect, dbOk);
 
             String uartPort = prop.getProperty("UART.PORTNAME", "/dev/serial0");
             int uartBaud = Integer.parseInt(prop.getProperty("UART.BAUD", "115200"));
@@ -33,10 +47,14 @@ public class Controller implements IObserverListener {
 
             System.out.println("UART-DB-Collector gestartet.");
             System.out.println("UART: " + uartPort + " @ " + uartBaud + " baud");
-            System.out.println("DB:   " + this.db.describe());
+            System.out.println("DB:   " + this.db.describe() + (dbOk ? "" : " (nicht erreichbar - puffere lokal)"));
+            System.out.println("Puffer: " + spool.getFile() + " (" + spool.size() + " Zeile(n) offen)");
+
+            this.worker.scheduleWithFixedDelay(this::maintain, 5, RETRY_S, TimeUnit.SECONDS);
 
         } catch (Exception ex) {
             // Fail fast instead of running half-initialised (NPE later on)
+            this.worker.shutdownNow();
             if (this.db != null) this.db.close();
             throw new IllegalStateException("UART-DB-Collector startup failed: " + ex.getMessage(), ex);
         }
@@ -49,39 +67,48 @@ public class Controller implements IObserverListener {
 
     public void shutdown() {
         this.com.close();
+        this.worker.shutdown();
+        try {
+            this.worker.awaitTermination(10, TimeUnit.SECONDS);
+        } catch (InterruptedException ignored) {
+            Thread.currentThread().interrupt();
+        }
         this.db.close();
         System.out.println("UART-DB-Collector beendet.");
     }
 
-    private Device getOrCreateDevice(String hardwareId) {
-        Device device = this.mapper.findByHardwareId(Device.class, hardwareId);
-        if (device == null) {
-            // Name defaults to the hardware id until the user renames it in the web app
-            device = new Device(hardwareId, Device.DeviceType.SENSOR, "unknown");
-            device.setHardwareId(hardwareId);
-            this.mapper.persist(device);
-            System.out.println("  Neues Device: " + hardwareId);
+    private boolean tryConnect() {
+        try {
+            this.db.connect();
+            return true;
+        } catch (RuntimeException ex) {
+            System.err.println("DB:   Verbindung fehlgeschlagen: " + ex.getMessage());
+            return false;
         }
-        device.setOnline(true);
-        device.setLastSeen(new Date());
-        this.mapper.merge(device);
-        return device;
     }
 
-    private Sensor getOrCreateSensor(Device device, Sensor.SensorType type) {
-        Sensor sensor = this.mapper.findByNameAndDevice(Sensor.class, type.name(), device);
-        if (sensor == null) {
-            sensor = new Sensor(device, type, type.name());
-            this.mapper.persist(sensor);
-            System.out.println("  Neuer Sensor: " + type.name() + " auf " + device.getName());
+    private boolean reconnect() {
+        try {
+            this.db.reconnect();
+            this.reconnectFailures = 0;
+            return true;
+        } catch (RuntimeException ex) {
+            if (this.reconnectFailures++ % LOG_EVERY_N_FAILURES == 0) {
+                System.err.println("DB:   Wiederverbindung fehlgeschlagen (" + this.reconnectFailures
+                        + ". Versuch): " + ex.getMessage());
+            }
+            return false;
         }
-        return sensor;
     }
 
-    private void persistMeasurement(Sensor sensor, Double value) {
-        if (value == null) return;
-        Measurement m = new Measurement(sensor, value);
-        this.mapper.persist(m);
+    // Periodic: notice a dropped tunnel while idle, reconnect and replay the buffer
+    private void maintain() {
+        try {
+            if (this.db.tunnelLost()) this.ingestor.markUnhealthy();
+            this.ingestor.drain();
+        } catch (RuntimeException ex) {
+            System.err.println("Puffer: Fehler beim Nachtragen: " + ex.getMessage());
+        }
     }
 
     /**
@@ -125,37 +152,9 @@ public class Controller implements IObserverListener {
         }
     }
 
-    private void processParsed(String src, java.util.Map<Sensor.SensorType, Double> values) {
-        if (values.isEmpty()) return;
-        try {
-            Device device = getOrCreateDevice(src);
-            for (var e : values.entrySet()) {
-                Sensor sensor = getOrCreateSensor(device, e.getKey());
-                persistMeasurement(sensor, e.getValue());
-            }
-            System.out.printf("OK  %-10s  %d Messwerte gespeichert%n", src, values.size());
-        } finally {
-            this.mapper.clear();
-        }
-    }
-
     @Override
     public void onSignaled(String answer) {
-        try {
-            JsonNode root = jsonMapper.readTree(answer);
-
-            if (root.has("sys")) {
-                System.out.println("System: " + root.get("sys").asText());
-                return;
-            }
-
-            if (root.has("temp") || root.has("pressure") || root.has("data")) {
-                ParsedData parsed = parseLine(root);
-                processParsed(parsed.src, parsed.values);
-            }
-
-        } catch (Exception ex) {
-            System.err.println("Parse-Fehler: " + ex.getMessage());
-        }
+        long receivedAt = System.currentTimeMillis();
+        this.worker.execute(() -> this.ingestor.ingest(answer, receivedAt));
     }
 }
