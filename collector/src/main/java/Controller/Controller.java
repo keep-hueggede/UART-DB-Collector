@@ -1,75 +1,28 @@
 package Controller;
 
-import Model.Actuator;
 import Model.Device;
 import Model.Measurement;
 import Model.Sensor;
-import Model.UserAccount;
-import Model.UserDevice;
 import Listener.IObserverListener;
+import ORMUtil.DatabaseSetup;
 import ORMUtil.ORMapper;
-import SSHTunnel.SSHTunnel;
-import SSHTunnel.SSHTunnelConfig;
 import UARTCom.UARTCom;
-import WebServer.DbReader;
-import WebServer.GoogleAuth;
-import WebServer.SessionManager;
-import WebServer.WebServer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 
 public class Controller implements IObserverListener {
 
     private UARTCom com;
     private ORMapper mapper;
-    private SSHTunnel tunnel;
-    private WebServer webServer;
+    private DatabaseSetup db;
     private final ObjectMapper jsonMapper = new ObjectMapper();
 
-    Properties prop;
-    String configFile = "./app.config";
-
-    private Map<Sensor.SensorType, Sensor> sensorCache = new HashMap<>();
-
-    public Controller() {
+    public Controller(Properties prop) {
         try {
-            this.prop = new Properties();
-
-            Path configPath = Paths.get(this.configFile);
-            if (!Files.exists(configPath)) {
-                configPath = Paths.get("./java/Controller/app.config");
-            }
-            this.prop.load(new FileInputStream(configPath.toFile()));
-
-            String dbDriver = prop.getProperty("DB.DRIVER", "h2").trim();
-            String dbHost = prop.getProperty("DB.HOST", "localhost").trim();
-            int dbPort = Integer.parseInt(prop.getProperty("DB.PORT", "3306").trim());
-            String dbName = prop.getProperty("DB.NAME", "wetter").trim();
-            String dbUser = prop.getProperty("DB.USER", "sa");
-            String dbPass = prop.getProperty("DB.PASSWORD", "");
-            String dbParams = prop.getProperty("DB.PARAMS", "");
-
-            SSHTunnelConfig sshConfig = SSHTunnelConfig.from(this.prop);
-            if (sshConfig.enabled) {
-                if (!"mysql".equalsIgnoreCase(dbDriver)) {
-                    throw new IllegalArgumentException("SSH.ENABLED=true erfordert DB.DRIVER=mysql"
-                            + " (aktuell: " + dbDriver + ")");
-                }
-                this.tunnel = new SSHTunnel(sshConfig);
-                dbPort = this.tunnel.start();
-                dbHost = "127.0.0.1";
-            }
-
-            this.mapper = new ORMapper(dbHost, dbPort, dbName, dbUser, dbPass, dbDriver, dbParams,
-                    List.of(Device.class, Sensor.class, Measurement.class, Actuator.class,
-                            UserAccount.class, UserDevice.class));
+            this.db = new DatabaseSetup(prop);
+            this.mapper = this.db.createMapper();
             this.mapper.connect();
 
             String uartPort = prop.getProperty("UART.PORTNAME", "/dev/serial0");
@@ -78,36 +31,13 @@ public class Controller implements IObserverListener {
             this.com.open();
             this.com.addListener(this);
 
-            boolean serverEnabled = Boolean.parseBoolean(prop.getProperty("SERVER.ENABLED", "true"));
-            if (serverEnabled) {
-                String serverHost = prop.getProperty("SERVER.HOST", "0.0.0.0");
-                int serverPort = Integer.parseInt(prop.getProperty("SERVER.PORT", "8080"));
-                String webRoot = prop.getProperty("SERVER.WEBROOT", "./web");
-                boolean secureCookie = Boolean.parseBoolean(prop.getProperty("SERVER.SECURE_COOKIE", "false"));
-                GoogleAuth google = new GoogleAuth(
-                        prop.getProperty("GOOGLE.CLIENT_ID", ""),
-                        prop.getProperty("GOOGLE.CLIENT_SECRET", ""),
-                        prop.getProperty("GOOGLE.REDIRECT_URI", ""));
-                SessionManager sessions = new SessionManager();
-                this.webServer = new WebServer(new DbReader(this.mapper), sessions, google,
-                        serverHost, serverPort, webRoot, secureCookie);
-                this.webServer.start();
-                if (!google.isConfigured()) {
-                    System.out.println("Web:  Google-Login nicht konfiguriert "
-                            + "(GOOGLE.CLIENT_ID / GOOGLE.CLIENT_SECRET fehlen)");
-                }
-            }
-
             System.out.println("UART-DB-Collector gestartet.");
             System.out.println("UART: " + uartPort + " @ " + uartBaud + " baud");
-            System.out.println("DB:   " + dbDriver + " -> " + dbHost + ":" + dbPort + "/" + dbName);
-            if (this.webServer != null) {
-                System.out.println("Web:  http://localhost:" + this.webServer.getPort() + "/");
-            }
+            System.out.println("DB:   " + this.db.describe());
 
         } catch (Exception ex) {
             // Fail fast instead of running half-initialised (NPE later on)
-            if (this.tunnel != null) this.tunnel.stop();
+            if (this.db != null) this.db.close();
             throw new IllegalStateException("UART-DB-Collector startup failed: " + ex.getMessage(), ex);
         }
     }
@@ -118,10 +48,8 @@ public class Controller implements IObserverListener {
     }
 
     public void shutdown() {
-        if (this.webServer != null) this.webServer.stop();
         this.com.close();
-        this.mapper.disconnect();
-        if (this.tunnel != null) this.tunnel.stop();
+        this.db.close();
         System.out.println("UART-DB-Collector beendet.");
     }
 
