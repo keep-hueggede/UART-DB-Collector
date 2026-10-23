@@ -62,6 +62,7 @@ public class WebServer {
                 .delete("/api/devices/{id}", new UnlinkDeviceHandler(repos))
                 .get("/api/sensors", new ListSensorsHandler(repos))
                 .get("/api/sensors/{id}", new GetSensorHandler(repos))
+                .put("/api/sensors/{id}/calibration", new SetCalibrationHandler(repos))
                 .get("/api/measurements/latest", new LatestMeasurementsHandler(repos))
                 .get("/api/measurements", new MeasurementSeriesHandler(repos));
 

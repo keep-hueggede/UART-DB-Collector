@@ -294,6 +294,34 @@ public class WebServerTest {
     }
 
     @Test
+    public void calibrationCorrectsDisplayedValues() throws Exception {
+        int temp = sensorIdByType("wetter1", "TEMPERATURE");
+        String ct = "application/json";
+        assertEquals(200, put("/api/sensors/" + temp + "/calibration", aliceToken, ct,
+                "{\"factor\":1.0,\"offset\":-1.0}").statusCode());
+
+        JsonNode body = json.readTree(get("/api/measurements?sensorId=" + temp, aliceToken).body());
+        assertEquals(19.0, body.get("points").get(0).get("v").asDouble(), 0.001);
+        assertEquals(23.0, body.get("stats").get("max").asDouble(), 0.001);
+        assertEquals(-1.0, body.get("sensor").get("calibration").get("offset").asDouble(), 0.001);
+    }
+
+    @Test
+    public void calibrationRejectsBadInputAndForeignSensors() throws Exception {
+        int temp = sensorIdByType("wetter1", "TEMPERATURE");
+        String path = "/api/sensors/" + temp + "/calibration";
+        String ct = "application/json";
+        assertEquals(415, put(path, aliceToken, "text/plain", "{\"factor\":1,\"offset\":0}").statusCode());
+        assertEquals(400, put(path, aliceToken, ct, "{\"factor\":1}").statusCode());
+        assertEquals(400, put(path, aliceToken, ct, "{\"factor\":\"1\",\"offset\":0}").statusCode());
+        assertEquals(400, put(path, aliceToken, ct, "{\"factor\":0,\"offset\":0}").statusCode());
+        assertEquals(400, put(path, aliceToken, ct, "{\"factor\":1,\"offset\":99999}").statusCode());
+        assertEquals(404, put(path, bobToken, ct, "{\"factor\":1,\"offset\":-1}").statusCode());
+        assertEquals(401, put(path, null, ct, "{\"factor\":1,\"offset\":-1}").statusCode());
+        assertEquals(405, get(path, aliceToken).statusCode());
+    }
+
+    @Test
     public void foreignSensorIdsAnswerNotFound() throws Exception {
         // alice's temp sensor must not be visible to bob
         int aliceTemp = sensorIdByType("wetter1", "TEMPERATURE");
