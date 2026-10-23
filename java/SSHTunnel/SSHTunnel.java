@@ -1,140 +1,198 @@
 package SSHTunnel;
 
-import java.io.ByteArrayInputStream;
-import java.io.InputStream;
-import java.net.InetAddress;
-import java.util.concurrent.Executors;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.JSchException;
+import com.jcraft.jsch.Session;
+import com.jcraft.jsch.UserInfo;
 
-import Listener.IListenerInterface;
-import Listener.Observer;
-import com.jcraft.jsch.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
-public class SSHTunnel extends Observer implements IListenerInterface {
+public final class SSHTunnel {
 
-    private InetAddress ip;
-    private int sshPort;
-    private int remotePort;
-    private int localPort;
-    private String userName;
-    private String password;
-    private Boolean portForward = false;
+    private static final String LOOPBACK = "127.0.0.1";
+    private static final int KEEPALIVE_INTERVAL_MS = 30_000;
+    private static final int KEEPALIVE_COUNT_MAX = 3;
 
-    private String pathToKnownHosts;
-
+    private final SSHTunnelConfig config;
     private Session session;
-    private Channel channel;
+    private int boundPort = -1;
 
-
-    /**
-     * Constructor
-     *
-     * @param _ip
-     * @param _sshPort
-     * @param _pathToKnownHosts
-     * @param _remotePort
-     * @param _localPort
-     */
-    public SSHTunnel(InetAddress _ip, int _sshPort, String _pathToKnownHosts, int _remotePort, int _localPort, String _userName, String _password) {
-        this.ip = _ip;
-        this.sshPort = _sshPort;
-        this.pathToKnownHosts = _pathToKnownHosts;
-        this.remotePort = _remotePort;
-        this.localPort = _localPort;
-        this.userName = _userName;
-        this.password = _password;
-        this.portForward = true;
+    public SSHTunnel(SSHTunnelConfig config) {
+        if (config == null) throw new IllegalArgumentException("SSHTunnelConfig fehlt");
+        this.config = config;
     }
 
-    /**
-     * Constructor
-     *
-     * @param _ip
-     * @param _sshPort
-     * @param _pathToKnownHosts
-     */
-    public SSHTunnel(InetAddress _ip, int _sshPort, String _pathToKnownHosts, String _userName, String _password) {
-        this.ip = _ip;
-        this.sshPort = _sshPort;
-        this.pathToKnownHosts = _pathToKnownHosts;
-        this.userName = _userName;
-        this.password = _password;
-    }
-
-    @Override
-    public void open() {
-        try {
-            JSch jsch = new JSch();
-            jsch.setKnownHosts(this.pathToKnownHosts);
-            this.session = jsch.getSession(userName, this.ip.getHostAddress(), this.sshPort);
-            this.session.setPassword(password);
-            this.session.connect();
-            if (portForward) {
-                this.session.setPortForwardingL(this.localPort, this.ip.getHostAddress(), this.remotePort);
-            }
-            this.channel = session.openChannel("exec");
-            //channel.connect();
-
-
-        } catch (Exception ex) {
-            System.err.println(ex);
-            ex.printStackTrace();
-        }
-    }
-
-    @Override
-    public void close() {
-        try {
-            this.channel.disconnect();
-            this.session.disconnect();
-        } catch (Exception ex) {
+    public synchronized int start() {
+        if (isRunning()) return boundPort;
+        if (this.session != null) {
+            disconnectQuietly(this.session);
             this.session = null;
-            System.err.println(ex);
-            ex.printStackTrace();
+            this.boundPort = -1;
+        }
+        config.validate();
+
+        JSch jsch = new JSch();
+        configureKnownHosts(jsch);
+        configureIdentity(jsch);
+
+        Session s;
+        try {
+            s = jsch.getSession(config.user, config.host, config.port);
+        } catch (JSchException e) {
+            throw new IllegalStateException("SSH-Session konnte nicht erstellt werden: "
+                    + e.getMessage(), e);
+        }
+        s.setConfig("StrictHostKeyChecking", config.strictHostKeyChecking ? "yes" : "no");
+        if (config.usesPasswordAuth()) {
+            s.setPassword(config.password);
+            s.setConfig("PreferredAuthentications", "password,keyboard-interactive");
+        } else {
+            s.setConfig("PreferredAuthentications", "publickey");
+        }
+        s.setUserInfo(new TunnelUserInfo(config));
+
+        try {
+            s.setServerAliveInterval(KEEPALIVE_INTERVAL_MS);
+            s.setServerAliveCountMax(KEEPALIVE_COUNT_MAX);
+            s.connect(config.connectTimeoutMs);
+        } catch (JSchException e) {
+            disconnectQuietly(s);
+            throw new IllegalStateException(connectErrorMessage(e), e);
+        }
+
+        try {
+            this.boundPort = s.setPortForwardingL(LOOPBACK, config.localPort,
+                    config.remoteHost, config.remotePort);
+            this.session = s;
+        } catch (JSchException e) {
+            disconnectQuietly(s);
+            throw new IllegalStateException("SSH-Portweiterleitung " + config.localPort + " -> "
+                    + config.remoteHost + ":" + config.remotePort
+                    + " fehlgeschlagen: " + e.getMessage(), e);
+        }
+
+        System.out.println("SSH:  " + LOOPBACK + ":" + boundPort + " -> " + config.remoteHost + ":"
+                + config.remotePort + " via " + config.user + "@" + config.host + ":" + config.port);
+        return boundPort;
+    }
+
+    public synchronized void stop() {
+        Session s = this.session;
+        this.session = null;
+        this.boundPort = -1;
+        if (s == null) return;
+        try {
+            s.disconnect();
+            System.out.println("SSH:  Tunnel geschlossen");
+        } catch (Exception e) {
+            System.err.println("SSH:  Fehler beim Schliessen des Tunnels: " + e.getMessage());
         }
     }
 
-    @Override
-    public void Send(String input) {
-
-        try {
-            ((ChannelExec) channel).setCommand(input);
-            this.channel.connect();
-        } catch (Exception ex) {
-            System.err.println(ex);
-            ex.printStackTrace();
-        }
-
+    public synchronized boolean isRunning() {
+        return session != null && session.isConnected();
     }
 
-    @Override
-    public void Listen() {
-        Executors.newSingleThreadExecutor().submit(()->{
-        try {
-            StringBuilder outBuffer = new StringBuilder();
-            InputStream input = this.channel.getInputStream();
-            while (true) {
-               int readByte = input.read();
+    public synchronized int getLocalPort() {
+        return boundPort;
+    }
 
-               if (readByte > -1) {
-                   outBuffer.append((char) readByte);
-               }else {
-                   this.fireSignal(outBuffer.toString());
-                   outBuffer = new StringBuilder();
-               }
+    private void configureKnownHosts(JSch jsch) {
+        if (config.knownHosts == null) {
+            System.out.println("SSH:  keine known_hosts-Datei - Hostkey-Pruefung deaktiviert");
+            return;
+        }
+        Path path = Path.of(config.knownHosts);
+        if (!Files.isRegularFile(path)) {
+            throw new IllegalStateException("SSH.KNOWN_HOSTS nicht gefunden: " + path
+                    + " (erzeugen mit: ssh-keyscan -p " + config.port + " "
+                    + config.host + " > " + path + ")");
+        }
+        try {
+            jsch.setKnownHosts(path.toString());
+        } catch (JSchException e) {
+            throw new IllegalStateException("SSH.KNOWN_HOSTS konnte nicht gelesen werden: "
+                    + path + " (" + e.getMessage() + ")", e);
+        }
+    }
+
+    private void configureIdentity(JSch jsch) {
+        if (config.usesPasswordAuth()) return;
+        Path key = Path.of(config.privateKey);
+        if (!Files.isRegularFile(key)) {
+            throw new IllegalStateException("SSH.PRIVATE_KEY nicht gefunden: " + key);
+        }
+        try {
+            if (config.passphrase == null) {
+                jsch.addIdentity(key.toString());
+            } else {
+                jsch.addIdentity(key.toString(), config.passphrase);
             }
-
-
-            //this.channel.disconnect();
-
-        } catch (Exception ex) {
-            System.err.println(ex);
-            ex.printStackTrace();
+        } catch (JSchException e) {
+            throw new IllegalStateException("SSH.PRIVATE_KEY konnte nicht geladen werden: "
+                    + key + " (" + e.getMessage() + ")", e);
         }
-        });
     }
 
-    @Override
-    public Boolean isConnected() {
-        return this.session.isConnected();
+    private String connectErrorMessage(JSchException e) {
+        String message = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+        String type = e.getClass().getSimpleName();
+        String hint = "";
+        if (message.contains("Auth fail") || message.contains("auth cancel")
+                || type.contains("AuthCancel") || type.contains("PartialAuth")) {
+            hint = " (Zugangsdaten bzw. Key pruefen)";
+        } else if (type.contains("UnknownHostKey") || message.contains("UnknownHostKey")) {
+            hint = " (Hostkey unbekannt: ssh-keyscan -p " + config.port + " "
+                    + config.host + " >> " + config.knownHosts + ")";
+        } else if (type.contains("ChangedHostKey") || message.contains("HostKey has been changed")) {
+            hint = " (Hostkey des Servers hat sich geaendert)";
+        }
+        return "SSH-Verbindung zu " + config.user + "@" + config.host + ":" + config.port
+                + " fehlgeschlagen: " + message + hint;
+    }
+
+    private static void disconnectQuietly(Session s) {
+        try {
+            s.disconnect();
+        } catch (Exception ignored) {
+        }
+    }
+
+    private static final class TunnelUserInfo implements UserInfo {
+        private final SSHTunnelConfig config;
+
+        TunnelUserInfo(SSHTunnelConfig config) {
+            this.config = config;
+        }
+
+        @Override
+        public String getPassphrase() {
+            return config.passphrase;
+        }
+
+        @Override
+        public String getPassword() {
+            return config.password;
+        }
+
+        @Override
+        public boolean promptPassword(String message) {
+            return config.usesPasswordAuth() && config.password != null;
+        }
+
+        @Override
+        public boolean promptPassphrase(String message) {
+            return config.passphrase != null;
+        }
+
+        @Override
+        public boolean promptYesNo(String message) {
+            return false;
+        }
+
+        @Override
+        public void showMessage(String message) {
+        }
     }
 }
