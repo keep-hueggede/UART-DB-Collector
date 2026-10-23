@@ -111,7 +111,7 @@ public class SessionManager {
         return COOKIE_NAME + "=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax" + (secure ? "; Secure" : "");
     }
 
-    static String extractCookie(String header, String name) {
+    public static String extractCookie(String header, String name) {
         for (String part : header.split(";")) {
             String p = part.trim();
             int eq = p.indexOf('=');
