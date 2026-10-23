@@ -5,13 +5,18 @@
 UART.PORTNAME=/dev/serial0
 UART.BAUD=115200
 
-# === Datenbank (lokal, wechselbar zu MySQL via SSH-Tunnel) ===
+# === Datenbank ===
+# DB.DRIVER=h2:    lokale Datei ./data/<DB.NAME>.mv.db
+# DB.DRIVER=mysql: DB.HOST:DB.PORT (direkt oder ueber den SSH-Tunnel unten)
 DB.DRIVER=h2
 DB.HOST=localhost
 DB.PORT=3306
 DB.NAME=wetter
 DB.USER=sa
 DB.PASSWORD=
+# Optional (nur MySQL): zusaetzliche JDBC-Parameter, z.B.
+#   useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+DB.PARAMS=
 
 # === Web-Server / Phone-App ===
 # Bindet standardmaessig auf alle Interfaces -> im LAN vom Phone erreichbar.
@@ -35,11 +40,27 @@ GOOGLE.CLIENT_SECRET=
 # Host-Header des Requests abgeleitet.
 GOOGLE.REDIRECT_URI=
 
-# === SSH-Tunnel (aktivieren wenn Remote-DB existiert) ===
-SSH.HOST=
+# === SSH-Tunnel zur MySQL-DB auf einem Server ===
+# SSH.ENABLED=true leitet 127.0.0.1:<SSH.LOCAL_PORT> ueber den SSH-Server an
+# SSH.REMOTE_HOST:SSH.REMOTE_PORT weiter; DB.HOST/DB.PORT werden dann ignoriert.
+# Voraussetzung: DB.DRIVER=mysql. Details siehe README.
+SSH.ENABLED=false
+SSH.HOST=server.example.org
 SSH.PORT=22
-SSH.USER=
+SSH.USER=dbuser
+# publickey (empfohlen) oder password. Ohne Angabe: publickey, wenn
+# SSH.PRIVATE_KEY gesetzt ist, sonst password.
+SSH.AUTH=publickey
+SSH.PRIVATE_KEY=~/.ssh/id_ed25519
+SSH.PASSPHRASE=
 SSH.PASSWORD=
-SSH.REMOTE_HOST=localhost
+# Hostkey-Pruefung; known_hosts erzeugen mit:
+#   ssh-keyscan -p 22 server.example.org > ./known_hosts
+SSH.KNOWN_HOSTS=./known_hosts
+SSH.STRICT_HOST_KEY_CHECKING=true
+# Ziel aus Sicht des SSH-Servers (meist dessen lokaler MySQL)
+SSH.REMOTE_HOST=127.0.0.1
 SSH.REMOTE_PORT=3306
-SSH.LOCAL_PORT=3307
+# 0 = freien lokalen Port automatisch waehlen (empfohlen)
+SSH.LOCAL_PORT=0
+SSH.CONNECT_TIMEOUT=15000
