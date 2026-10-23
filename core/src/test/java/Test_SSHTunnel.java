@@ -115,6 +115,30 @@ public class Test_SSHTunnel {
     }
 
     @Test
+    public void restartReusesLocalPort() throws Exception {
+        tunnel = new SSHTunnel(config());
+        int first = tunnel.start();
+        tunnel.stop();
+        assertEquals(first, tunnel.start());
+        assertEcho(first);
+    }
+
+    @Test
+    public void reconnectAfterConnectionLossKeepsPort() throws Exception {
+        tunnel = new SSHTunnel(config());
+        int first = tunnel.start();
+
+        // Server drops the connection (e.g. network outage or server restart)
+        for (var s : sshd.getActiveSessions()) s.close(true);
+        long deadline = System.currentTimeMillis() + 10_000;
+        while (tunnel.isRunning() && System.currentTimeMillis() < deadline) Thread.sleep(50);
+        assertFalse(tunnel.isRunning());
+
+        assertEquals(first, tunnel.start());
+        assertEcho(first);
+    }
+
+    @Test
     public void stopClosesLocalListener() throws Exception {
         tunnel = new SSHTunnel(config());
         int localPort = tunnel.start();

@@ -17,6 +17,8 @@ public final class SSHTunnel {
     private final SSHTunnelConfig config;
     private Session session;
     private int boundPort = -1;
+    // Kept across stop/restart: the JDBC URL points at this port, so a reconnect must reuse it
+    private int lastBoundPort = -1;
 
     public SSHTunnel(SSHTunnelConfig config) {
         if (config == null) throw new IllegalArgumentException("SSHTunnelConfig fehlt");
@@ -61,13 +63,15 @@ public final class SSHTunnel {
             throw new IllegalStateException(connectErrorMessage(e), e);
         }
 
+        int wantedPort = (config.localPort == 0 && lastBoundPort > 0) ? lastBoundPort : config.localPort;
         try {
-            this.boundPort = s.setPortForwardingL(LOOPBACK, config.localPort,
+            this.boundPort = s.setPortForwardingL(LOOPBACK, wantedPort,
                     config.remoteHost, config.remotePort);
+            this.lastBoundPort = this.boundPort;
             this.session = s;
         } catch (JSchException e) {
             disconnectQuietly(s);
-            throw new IllegalStateException("SSH-Portweiterleitung " + config.localPort + " -> "
+            throw new IllegalStateException("SSH-Portweiterleitung " + wantedPort + " -> "
                     + config.remoteHost + ":" + config.remotePort
                     + " fehlgeschlagen: " + e.getMessage(), e);
         }
