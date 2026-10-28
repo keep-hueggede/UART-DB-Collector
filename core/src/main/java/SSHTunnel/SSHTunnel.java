@@ -140,16 +140,27 @@ public final class SSHTunnel {
     }
 
     private String connectErrorMessage(JSchException e) {
-        String message = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
         String type = e.getClass().getSimpleName();
+        String message = e.getMessage() == null ? type : e.getMessage();
+        // jsch messages are not consistent in casing ("Auth fail" vs "Auth cancel")
+        String t = type.toLowerCase();
+        String m = message.toLowerCase();
         String hint = "";
-        if (message.contains("Auth fail") || message.contains("auth cancel")
-                || type.contains("AuthCancel") || type.contains("PartialAuth")) {
-            hint = " (Zugangsdaten bzw. Key pruefen)";
-        } else if (type.contains("UnknownHostKey") || message.contains("UnknownHostKey")) {
-            hint = " (Hostkey unbekannt: ssh-keyscan -p " + config.port + " "
-                    + config.host + " >> " + config.knownHosts + ")";
-        } else if (type.contains("ChangedHostKey") || message.contains("HostKey has been changed")) {
+        if (m.contains("auth fail") || m.contains("auth cancel")) {
+            if (!config.usesPasswordAuth() && config.passphrase == null) {
+                hint = " (Key oder Passphrase pruefen - verschluesselte Keys brauchen SSH.PASSPHRASE)";
+            } else {
+                hint = " (Zugangsdaten bzw. Key pruefen)";
+            }
+        } else if (t.contains("unknownhostkey") || m.contains("unknownhostkey")) {
+            if (config.knownHosts == null) {
+                hint = " (Hostkey unbekannt: ssh-keyscan -p " + config.port + " " + config.host
+                        + " in eine known_hosts-Datei schreiben und SSH.KNOWN_HOSTS setzen)";
+            } else {
+                hint = " (Hostkey unbekannt: ssh-keyscan -p " + config.port + " " + config.host
+                        + " >> " + config.knownHosts + ")";
+            }
+        } else if (t.contains("changedhostkey") || m.contains("hostkey has been changed")) {
             hint = " (Hostkey des Servers hat sich geaendert)";
         }
         return "SSH-Verbindung zu " + config.user + "@" + config.host + ":" + config.port
