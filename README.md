@@ -189,6 +189,7 @@ SSH.LOCAL_PORT=0
 | Meldung | Ursache / Loesung |
 |---|---|
 | `Auth fail` | `SSH.USER`, Key oder Passwort pruefen |
+| `Auth cancel` | verschluesselter Key ohne `SSH.PASSPHRASE`; Passphrase setzen |
 | `Hostkey unbekannt: ssh-keyscan …` | Hostkey in `known_hosts` aufnehmen |
 | `ConnectException: Connection refused` | `SSH.HOST`/`SSH.PORT` pruefen |
 | `SSH.ENABLED=true erfordert DB.DRIVER=mysql` | `DB.DRIVER=mysql` setzen |
