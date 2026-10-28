@@ -88,17 +88,23 @@ public class Controller implements IObserverListener {
     }
 
     private boolean reconnect() {
+        RuntimeException error = null;
         try {
             this.db.reconnect();
-            this.reconnectFailures = 0;
-            return true;
-        } catch (RuntimeException ex) {
-            if (this.reconnectFailures++ % LOG_EVERY_N_FAILURES == 0) {
-                System.err.println("DB:   Wiederverbindung fehlgeschlagen (" + this.reconnectFailures
-                        + ". Versuch): " + ex.getMessage());
+            // A rebuilt pool alone is no proof: only a live DB counts as success
+            if (this.db.ping()) {
+                this.reconnectFailures = 0;
+                return true;
             }
-            return false;
+        } catch (RuntimeException ex) {
+            error = ex;
         }
+        if (this.reconnectFailures++ % LOG_EVERY_N_FAILURES == 0) {
+            String reason = error != null ? error.getMessage() : "Ping nach Neuaufbau fehlgeschlagen";
+            System.err.println("DB:   Wiederverbindung fehlgeschlagen (" + this.reconnectFailures
+                    + ". Versuch): " + reason);
+        }
+        return false;
     }
 
     // Periodic: notice a dropped tunnel while idle, reconnect and replay the buffer

@@ -96,6 +96,11 @@ public final class DatabaseSetup {
         mapper.reconnect();
     }
 
+    /** True if the database answers on a fresh connection. */
+    public boolean ping() {
+        return mapper != null && mapper.ping();
+    }
+
     public boolean tunnelLost() {
         return tunnel != null && !tunnel.isRunning();
     }
