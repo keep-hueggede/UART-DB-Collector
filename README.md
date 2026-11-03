@@ -392,6 +392,43 @@ ESP32-C6 --UART--> Pi: uart-db-collector.jar --SSH-Tunnel--> Server: MySQL (127.
 Beide Programme legen das Schema per Hibernate an bzw. aktualisieren es -
 deshalb immer **beide Jars aus demselben Stand** ausrollen.
 
+### Releases und Updates des Webservers
+
+Ein Versions-Tag baut alles, fuehrt die Tests aus und veroeffentlicht ein
+GitHub-Release mit beiden Jars, `SHA256SUMS` und der SBOM
+(`.github/workflows/release.yml`):
+
+```bash
+git tag v1.2.0 && git push origin v1.2.0
+```
+
+Auf dem Server einmalig einrichten:
+
+```bash
+sudo install -m 755 deploy/uart-db-update.sh /usr/local/bin/uart-db-update
+echo 'APP_DIR=/var/www/example.org' | sudo tee /etc/default/uart-db-update   # Verzeichnis mit Jar und app.config
+```
+
+Danach genuegt fuer ein Update:
+
+```bash
+sudo uart-db-update --check   # installierte und neueste Version anzeigen
+sudo uart-db-update           # neueste Version installieren
+sudo uart-db-update v1.1.0    # bestimmte Version (auch zurueck)
+```
+
+Das Skript laedt das Jar aus dem Release, prueft die SHA-256-Summe, behaelt das
+alte Jar als `.bak`, startet den Dienst neu und wartet auf `/api/health`. Kommt
+der Dienst nicht hoch, wird das alte Jar automatisch zurueckgespielt. Die
+installierte Version steht in `.release` im Anwendungsverzeichnis.
+
+Optional automatisch jede Nacht:
+
+```bash
+sudo cp deploy/uart-db-update.service deploy/uart-db-update.timer /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now uart-db-update.timer
+```
+
 ## Projektstruktur
 
 Klassendiagramme (UML) beider Module: [docs/UML.md](docs/UML.md)
