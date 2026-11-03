@@ -38,17 +38,11 @@ SERVER.WEBROOT=./web
 # Cookie "Secure"-Flag setzen, wenn hinter HTTPS (z.B. Reverse-Proxy/SSH-Tunnel).
 SERVER.SECURE_COOKIE=false
 
-# === Google-Login (Pflicht fuer den Web-Zugang) ===
-# Google Cloud Console -> APIs & Dienste -> OAuth-Berechtigungen:
-#   - "Webanwendung"-OAuth-Client erstellen
-#   - Autorisierte Weiterleitungs-URIs: http://<server-ip>:8080/auth/callback
-# Ohne diese Werte bleibt die API gesperrt (401) und der Login-Button
-# zeigt einen Hinweis.
-GOOGLE.CLIENT_ID=
-GOOGLE.CLIENT_SECRET=
-# Optional: abweichende Weiterleitungs-URI; sonst wird sie aus dem
-# Host-Header des Requests abgeleitet.
-GOOGLE.REDIRECT_URI=
+# === Google-Login ===
+# Wird bei der Ersteinrichtung im Browser eingetragen und in der Datenbank
+# gespeichert (spaeter: Verwalten -> Server). Hier nicht mehr noetig;
+# vorhandene GOOGLE.CLIENT_ID / GOOGLE.CLIENT_SECRET / GOOGLE.REDIRECT_URI
+# werden beim ersten Start einmalig in die Datenbank uebernommen.
 
 # === SSH-Tunnel zur MySQL-DB auf dem Webserver - nur Collector (Pi) ===
 # SSH.ENABLED=true leitet 127.0.0.1:<SSH.LOCAL_PORT> ueber den SSH-Server an

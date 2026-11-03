@@ -14,7 +14,10 @@ Hibernate in einer H2-Datenbank oder in einer MySQL-Datenbank auf einem Server
   Daten zwischengespeichert und mit Empfangszeit nachgetragen; der SSH-Tunnel
   verbindet sich selbststaendig neu
 * Web-App (PWA) mit Google-Login, Verlaufscharts und Auto-Aktualisierung
-* Gerateverwaltung: eigene Feldgerate verknuepfen, umbenennen, Verknuepfung loesen
+* Ersteinrichtung im Browser (wie bei einem CMS): Einmal-Code aus einer Datei
+  auf dem Server, das erste Google-Konto wird Administrator
+* Rollen: Administratoren weisen Benutzern Feldgeraete zu, benennen Geraete um,
+  setzen Korrekturwerte und pflegen die Einstellungen
 * Daten werden pro Nutzer gefiltert (Edge-Devices schreiben weiterhin alles)
 * REST-API mit Session- oder Bearer-Authentifizierung
 * Betrieb als systemd-Dienst auf dem Raspberry Pi
@@ -41,18 +44,19 @@ java -jar webserver/target/uart-db-webserver.jar    # Server: Web-App + API
 ```
 
 Beide lesen `./app.config` im Arbeitsverzeichnis (oder den Pfad als erstes
-Argument). Tests:
+Argument). Tests und Testabdeckung:
 
 ```bash
-mvn test
+mvn verify      # Tests + JaCoCo-Bericht je Modul in */target/site/jacoco/index.html
 ```
 
 Die GitHub Action (`.github/workflows/maven.yml`) baut bei jedem Push/PR auf
-`main` alle Module, fuehrt die Tests aus und stellt Testberichte und beide Jars
-als Artefakte bereit.
+`main` alle Module, fuehrt die Tests aus, zeigt die Abdeckung je Modul in der
+Job-Zusammenfassung und stellt Test-/Abdeckungsberichte und beide Jars als
+Artefakte bereit.
 
-Die Tests laufen ohne externe Infrastruktur: HTTP-Server und SSH-Server werden
-im Testprozess gestartet. Nur `Test_MySQLConnector` und `Test_UARTCom` sind
+Die Tests laufen ohne externe Infrastruktur: HTTP-Server, SSH-Server und ein
+Stub der Google-Endpunkte werden im Testprozess gestartet. Nur `Test_MySQLConnector` und `Test_UARTCom` sind
 deaktiviert, weil sie einen echten MySQL-Server bzw. serielle Hardware
 benoetigen.
 
@@ -79,17 +83,17 @@ SERVER.PORT=8080
 SERVER.WEBROOT=./web    # optional; das web/ Verzeichnis im jar ist der Fallback
 SERVER.SECURE_COOKIE=false  # true bei HTTPS hinter Reverse-Proxy
 
-GOOGLE.CLIENT_ID=       # OAuth-Client (Typ "Webanwendung") aus der
-GOOGLE.CLIENT_SECRET=   # Google Cloud Console; ohne diese Werte ist die
-GOOGLE.REDIRECT_URI=    # API gesperrt (401) - siehe unten
-
 SSH.ENABLED=false       # true: MySQL auf einem Server via SSH-Tunnel
 ```
 
 Beide Jars lesen `./app.config` oder den als erstes Argument uebergebenen
-Pfad; fehlt die Datei, bricht der Start ab. Ohne
-`GOOGLE.CLIENT_ID`/`GOOGLE.CLIENT_SECRET` laeuft der Webserver, aber die
-Web-API bleibt gesperrt (401) und der Login-Button zeigt einen Hinweis.
+Pfad; fehlt die Datei, bricht der Start ab.
+
+Google-Login und Sitzungsdauer stehen **nicht** mehr in der `app.config`,
+sondern in der Datenbank (Tabelle `Settings`) und werden bei der
+Ersteinrichtung bzw. spaeter unter *Verwalten -> Server* gepflegt. Alte
+`GOOGLE.*`-Werte werden beim ersten Start einmalig uebernommen und koennen danach
+aus der Datei entfernt werden.
 
 ## Datenbank
 
@@ -201,45 +205,74 @@ SSH.LOCAL_PORT=0
 Der Web-Server laeuft im gleichen Prozess wie der Collector und liest ueber den
 bestehenden `ORMapper` (Hibernate) aus der Datenbank.
 
-1. Phone und Pi im selben Netzwerk.
-2. Am Phone oeffnen: `http://<pi-ip>:8080`
+1. Phone und Server im selben Netzwerk (bzw. Server im Internet).
+2. Am Phone oeffnen: `http://<server-ip>:8080`
 3. Mit Google anmelden.
-4. Ueber "Verwalten" das eigene Feldgeraet verknuepfen (aus der DB waehlen
-   oder per Namen neu anlegen - Daten erscheinen, sobald die Edge-Device
-   dafuer meldet).
-5. Geraet nach Bedarf umbenennen (Stift-Symbol auf der Geraetekarte).
-6. "Zum Home-Screen hinzufuegen" -> laeuft dann wie eine App (PWA, offline-faehig
+4. Ein Administrator weist dem Konto unter *Verwalten* die Feldgeraete zu.
+   Bis dahin zeigt die App nur einen Hinweis.
+5. "Zum Home-Screen hinzufuegen" -> laeuft dann wie eine App (PWA, offline-faehig
    via Service Worker, Auto-Aktualisierung, Verlauf-Charts je Sensor).
 
-Sichtbar sind nur Geraete, die mit dem angemeldeten Konto verknuepft sind; die
-Edge-Devices schreiben weiterhin **alle** erreichbaren Geraete in die Datenbank,
-die Filterung passiert ausschliesslich beim Lesen.
+Die Edge-Devices schreiben weiterhin **alle** erreichbaren Geraete in die
+Datenbank; welche ein Benutzer sieht, entscheidet allein die Zuweisung durch
+einen Administrator.
 
 Einstellungen (Zahnrad): Server-URL ueberschreiben (noetig nur, wenn die App
 anderswo heraufgeladen wird) und Auto-Aktualisierungs-Intervall.
 
-### Google-Login einrichten
+### Ersteinrichtung und erster Administrator
+
+Solange es keinen Administrator gibt, schreibt der Webserver beim Start einen
+Einmal-Code in `setup-code.txt` in seinem Arbeitsverzeichnis (Rechte `600`)
+und meldet den Pfad im Log. Wer die Seite dann aufruft, landet auf der
+Einrichtungsseite:
+
+1. Code aus der Datei eintragen, z.B. `cat /opt/uart-db/setup-code.txt` (`WorkingDirectory` des Dienstes).
+   Damit ist nachgewiesen, dass man Zugriff auf das Server-Verzeichnis hat -
+   Root-Rechte sind nicht noetig.
+2. In der [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+   einen OAuth-Client vom Typ **Webanwendung** anlegen; die Seite zeigt die
+   Weiterleitungs-URI an, die dort eingetragen werden muss. Client-ID und
+   Clientschluessel auf der Einrichtungsseite eintragen.
+3. *Speichern und mit Google anmelden*: Das Google-Konto, mit dem man sich jetzt
+   anmeldet, wird Administrator. Die Code-Datei wird geloescht, die
+   Einrichtung ist geschlossen.
+
+Nach 10 falschen Codes wird ein neuer Code in die Datei geschrieben. Geht der
+letzte Administrator verloren (z.B. DB neu aufgesetzt), oeffnet ein Neustart
+ohne Admin die Einrichtung erneut.
+
+### Rollen
+
+| | Benutzer | Administrator |
+|---|---|---|
+| Daten sehen | nur zugewiesene Feldgeraete | alle |
+| Geraete umbenennen, Korrekturwerte | – | ja |
+| Benutzer freigeben, Geraete zuweisen | – | ja |
+| Andere zu Administratoren machen | – | ja (der letzte Admin kann nicht entzogen werden) |
+| Google-Login, Sitzungsdauer aendern | – | ja (*Verwalten -> Server*) |
+
+Neue Google-Konten werden beim ersten Login als Benutzer ohne Geraete angelegt.
+Rollenaenderungen gelten sofort, auch fuer bestehende Sitzungen.
+
+### Google-Login
 
 Der Web-Zugang ist ausschliesslich ueber Google-Konten moeglich - es gibt keine
-lokale Registrierung und keine Passwoerter:
-
-1. [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
-   -> *APIs & Dienste* -> *OAuth-Berechtigungen* -> *Anwendungsidentitaet*
-   erstellen, E-Mail-Adressen als Scope zulassen.
-2. *OAuth-Client-ID* vom Typ **Webanwendung** anlegen.
-3. Autorisierte Weiterleitungs-URIs: `http://<server-ip>:8080/auth/callback`
-   (bzw. die in `GOOGLE.REDIRECT_URI` gesetzte URI).
-4. Client-ID/Secret in die `app.config` eintragen und neu starten.
-
-Ist `GOOGLE.REDIRECT_URI` leer, wird die Callback-URL aus dem `Host`-Header des
-Requests abgeleitet. Beim ersten Login wird das Konto automatisch angelegt. Die
-PWA merkt sich die Sitzung (30 Tage), `Abmelden` beendet sie serverseitig.
+lokale Registrierung und keine Passwoerter. Ist keine Weiterleitungs-URI
+eingetragen, wird sie aus dem `Host`-Header des Requests abgeleitet (hinter
+einem Reverse-Proxy mit `X-Forwarded-Proto`). Die PWA merkt sich die Sitzung
+(Standard 30 Tage), `Abmelden` beendet sie serverseitig.
 
 ### Sicherheit
 
-* Alle `/api/*` Endpunkte ausser `/api/health` verlangen einen Session-Token
-  (401 sonst); unbekannte bzw. fremde IDs antworten mit 404, damit sich
-  Geraete nicht enumerieren lassen.
+* Alle `/api/*` Endpunkte ausser `/api/health` und `/api/setup` verlangen einen
+  Session-Token (401 sonst); Admin-Endpunkte antworten Benutzern mit 403.
+  Unbekannte bzw. nicht zugewiesene IDs antworten mit 404, damit sich Geraete
+  nicht enumerieren lassen.
+* Ersteinrichtung: Code nur in einer Datei auf dem Server, nie per HTTP;
+  Vergleich in konstanter Zeit, nach 10 Fehlversuchen neuer Code. Der
+  Nachweis wird per kurzlebigem `HttpOnly`-Cookie an den Google-Login gebunden.
+* Der Google-Clientschluessel wird nie ausgeliefert, auch nicht an Admins.
 * Sessions: 256-Bit-Token (SecureRandom), nur dessen SHA-256-Hash liegt
   serverseitig; Cookie `HttpOnly` + `SameSite=Lax`, 30 Tage gueltig, per
   Logout sofort widerrufen. Native Apps nutzen stattdessen `Authorization:
@@ -253,28 +286,35 @@ PWA merkt sich die Sitzung (30 Tage), `Abmelden` beendet sie serverseitig.
 
 ### REST-API
 
-Alle `/api/*` Endpunkte ausser `/api/health` erfordern Authorization (Cookie
-oder Bearer) und sind auf den angemeldeten Nutzer eingeschraenkt. Die
-`/auth/*` Endpunkte sind der Login-Flow selbst.
+Alle `/api/*` Endpunkte ausser `/api/health` und `/api/setup` erfordern
+Authorization (Cookie oder Bearer). Lesende Endpunkte zeigen Benutzern nur die
+zugewiesenen Geraete, Administratoren alles. Schreibende Endpunkte verlangen
+`Content-Type: application/json` (sonst 415). Die `/auth/*` Endpunkte sind der
+Login-Flow selbst.
 
-| Endpoint | Beschreibung |
-|---|---|
-| `GET /api/health` | Status + Device-Anzahl (oeffentlich, keine Daten) |
-| `GET /auth/login` | Startet den Google-Login (302) |
-| `GET /auth/callback` | OAuth-Rueckkehr; setzt Session, leitet auf `/#token=…` um |
-| `POST /auth/logout` | Beendet die Session |
-| `GET /api/auth/me` | Eigener Account (eigene Session vorausgesetzt) |
-| `GET /api/devices` | Verknuepfte Devices inkl. `hardwareId`, Sensor-Anzahl, letzter Messzeitpunkt |
-| `GET /api/devices/available` | Noch **nicht** verknuepfte Devices (nur Identitaet, keine Werte) |
-| `POST /api/devices` | Verknuepfen: `{"deviceId":n}` oder `{"name":"…"}` (neuer Name legt das Device an) |
-| `POST /api/devices/{id}/link` | Verknuepfen per Pfad |
-| `PUT /api/devices/{id}` | Umbenennen: `{"name":"…"}` (1-40 Zeichen; 409 bei belegtem Namen, 415 bei falschem Content-Type, 413 bei zu grossem Body) |
-| `DELETE /api/devices/{id}` | Verknuepfung loesen |
-| `GET /api/sensors` | Alle Sensoren der verknuepften Devices |
-| `GET /api/sensors/{id}` | Ein Sensor (fremd/unbekannt -> 404) |
-| `GET /api/measurements/latest` | Letzter Messwert je eigenem Sensor |
-| `GET /api/measurements?sensorId={id}&from={ms}&to={ms}&limit={n}` | Zeitreihe + Min/Max/Ø (fremd -> 404) |
-| `GET /api/measurements?sensorId={id}&window={ms}` | Zeitreihe der letzten `window` Millisekunden |
+| Endpoint | Zugriff | Beschreibung |
+|---|---|---|
+| `GET /api/health` | oeffentlich | Status + Device-Anzahl (keine Daten) |
+| `GET /api/setup` | oeffentlich | `setupRequired`; waehrend der Einrichtung auch Pfad der Code-Datei und Weiterleitungs-URI |
+| `POST /api/setup` | oeffentlich | `{"code","googleClientId","googleClientSecret"}`; 403 falscher Code, 409 schon eingerichtet |
+| `GET /auth/login` | oeffentlich | Startet den Google-Login (302) |
+| `GET /auth/callback` | oeffentlich | OAuth-Rueckkehr; setzt Session, leitet auf `/#token=…` um |
+| `POST /auth/logout` | Benutzer | Beendet die Session |
+| `GET /api/auth/me` | Benutzer | Eigener Account inkl. `role` und `approved` |
+| `GET /api/devices` | Benutzer | Sichtbare Devices inkl. `hardwareId`, Sensor-Anzahl, letzter Messzeitpunkt |
+| `GET /api/sensors` | Benutzer | Sensoren der sichtbaren Devices |
+| `GET /api/sensors/{id}` | Benutzer | Ein Sensor (nicht sichtbar/unbekannt -> 404) |
+| `GET /api/measurements/latest` | Benutzer | Letzter Messwert je sichtbarem Sensor |
+| `GET /api/measurements?sensorId={id}&from={ms}&to={ms}&limit={n}` | Benutzer | Zeitreihe + Min/Max/Ø |
+| `GET /api/measurements?sensorId={id}&window={ms}` | Benutzer | Zeitreihe der letzten `window` Millisekunden |
+| `PUT /api/devices/{id}` | Admin | Umbenennen: `{"name":"…"}` (1-40 Zeichen; 409 bei belegtem Namen) |
+| `PUT /api/sensors/{id}/calibration` | Admin | Korrekturwerte `{"factor","offset"}` |
+| `GET /api/admin/users` | Admin | Alle Konten mit Rolle, letztem Login und zugewiesenen Device-IDs |
+| `PUT /api/admin/users/{id}/role` | Admin | `{"role":"ADMIN"\|"USER"}`; 409 fuer den letzten Admin |
+| `PUT /api/admin/users/{id}/devices/{deviceId}` | Admin | Device zuweisen |
+| `DELETE /api/admin/users/{id}/devices/{deviceId}` | Admin | Zuweisung entfernen |
+| `GET /api/admin/settings` | Admin | Google-Client (ohne Schluessel) und Sitzungsdauer |
+| `PUT /api/admin/settings` | Admin | `googleClientId`, `googleClientSecret` (leer = unveraendert), `googleRedirectUri`, `sessionTtlDays` (1-365) |
 
 ## Native App (spaeter)
 
@@ -329,9 +369,10 @@ ESP32-C6 --UART--> Pi: uart-db-collector.jar --SSH-Tunnel--> Server: MySQL (127.
   Port-Forwarding, z.B. in `authorized_keys`:
   `restrict,port-forwarding,permitopen="127.0.0.1:3306" ssh-ed25519 AAAA...`
 * **Server** (`app.config`): `DB.DRIVER=mysql`, `DB.HOST=127.0.0.1`,
-  `SERVER.HOST=127.0.0.1`, `SERVER.SECURE_COOKIE=true`,
-  `GOOGLE.REDIRECT_URI=https://<domain>/auth/callback`. Dienst:
+  `SERVER.HOST=127.0.0.1`, `SERVER.SECURE_COOKIE=true`. Dienst:
   `deploy/uart-db-webserver.service` (Systemdienst unter eigenem Nutzer).
+  Danach `https://<domain>` aufrufen und die Ersteinrichtung durchlaufen
+  (Code liegt in `setup-code.txt` im `WorkingDirectory` des Dienstes).
 * **Reverse-Proxy mit HTTPS**, z.B. Caddy (holt das Zertifikat selbst):
 
   ```
