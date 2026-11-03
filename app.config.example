@@ -40,7 +40,7 @@ SERVER.SECURE_COOKIE=false
 
 # === Google-Login ===
 # Wird bei der Ersteinrichtung im Browser eingetragen und in der Datenbank
-# gespeichert (spaeter: Verwalten -> Server). Hier nicht mehr noetig;
+# gespeichert (spaeter: Zahnrad -> Administration -> Server). Hier nicht mehr noetig;
 # vorhandene GOOGLE.CLIENT_ID / GOOGLE.CLIENT_SECRET / GOOGLE.REDIRECT_URI
 # werden beim ersten Start einmalig in die Datenbank uebernommen.
 

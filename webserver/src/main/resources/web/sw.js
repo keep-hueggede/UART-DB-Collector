@@ -1,9 +1,10 @@
-const CACHE = "uart-db-v6";
+// bump together with the ?v= of app.js/style.css in index.html
+const CACHE = "uart-db-v7";
 const SHELL = [
   "./",
   "index.html",
-  "app.js",
-  "style.css",
+  "app.js?v=7",
+  "style.css?v=7",
   "manifest.webmanifest",
   "favicon.svg",
   "icon-192.png",

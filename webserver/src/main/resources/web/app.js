@@ -272,6 +272,7 @@ const state = {
   refreshTimer: null,
   currentSensorId: null,
   loggedIn: false,
+  adminOpen: false,
   me: null,
 };
 
@@ -483,30 +484,40 @@ $("range-tabs").addEventListener("click", e => {
 
 /* ---------------------------------------------------------------- admin */
 
-const adminDlg = $("admin-dialog");
 const reportError = err => { if (!err.isAuth) toast(err.message, true); };
+const ADMIN_TABS = { users: () => loadAdminUsers(), server: () => loadAdminSettings(), app: async () => loadAppSettings() };
 
-$("btn-admin").addEventListener("click", () => {
+$("btn-settings").addEventListener("click", () => {
+  if (!isAdmin()) return; // the button is hidden for users; the API enforces it anyway
+  state.currentSensorId = null;
+  state.adminOpen = true;
+  $("view-dashboard").classList.add("hidden");
+  $("view-detail").classList.add("hidden");
+  $("view-admin").classList.remove("hidden");
+  window.scrollTo(0, 0);
   showAdminTab("users");
-  loadAdminUsers().then(() => adminDlg.showModal()).catch(reportError);
 });
 
-$("btn-close-admin").addEventListener("click", () => {
-  adminDlg.close();
+$("btn-admin-back").addEventListener("click", closeAdmin);
+
+function closeAdmin() {
+  state.adminOpen = false;
+  $("view-admin").classList.add("hidden");
+  $("view-dashboard").classList.remove("hidden");
   refresh().catch(() => {});
-});
+}
 
 $("admin-tabs").addEventListener("click", e => {
   const btn = e.target.closest("button[data-tab]");
-  if (!btn) return;
-  showAdminTab(btn.dataset.tab);
-  (btn.dataset.tab === "users" ? loadAdminUsers() : loadAdminSettings()).catch(reportError);
+  if (btn) showAdminTab(btn.dataset.tab);
 });
 
 function showAdminTab(tab) {
   for (const b of $("admin-tabs").children) b.classList.toggle("active", b.dataset.tab === tab);
-  $("admin-users").classList.toggle("hidden", tab !== "users");
-  $("admin-server").classList.toggle("hidden", tab !== "server");
+  for (const name of Object.keys(ADMIN_TABS)) {
+    $("admin-" + name).classList.toggle("hidden", name !== tab);
+  }
+  ADMIN_TABS[tab]().catch(reportError);
 }
 
 async function loadAdminUsers() {
@@ -733,7 +744,11 @@ async function refresh() {
   const btn = $("btn-refresh");
   btn.classList.add("spinning");
   try {
-    if (state.currentSensorId != null) {
+    if (state.adminOpen) {
+      // reload the visible admin tab, not the hidden dashboard
+      const tab = $("admin-tabs").querySelector(".active")?.dataset.tab || "users";
+      await ADMIN_TABS[tab]();
+    } else if (state.currentSensorId != null) {
       await loadDetail();
     } else {
       await loadDashboard();
@@ -766,28 +781,21 @@ document.addEventListener("visibilitychange", () => {
   if (!document.hidden && state.loggedIn) refresh().catch(() => {});
 });
 
-/* ------------------------------------------------------------ settings */
+/* ------------------------------------------------ app settings (admin) */
 
-const dlg = $("settings-dialog");
-
-$("btn-settings").addEventListener("click", () => {
+function loadAppSettings() {
   $("set-server").value = settings.serverUrl;
   $("set-refresh").value = String(settings.refreshSec);
-  dlg.showModal();
-});
+}
 
-$("settings-form").addEventListener("submit", () => {
-  setTimeout(() => {
-    if (dlg.returnValue !== "save") return;
-    settings.serverUrl = $("set-server").value.trim();
-    settings.refreshSec = parseInt($("set-refresh").value, 10);
-    localStorage.setItem("settings.serverUrl", settings.serverUrl);
-    localStorage.setItem("settings.refreshSec", String(settings.refreshSec));
-    scheduleRefresh();
-    if (state.loggedIn) {
-      refresh().then(() => toast("Einstellungen gespeichert")).catch(err => toast(err.message, true));
-    }
-  }, 0);
+$("admin-app").addEventListener("submit", e => {
+  e.preventDefault();
+  settings.serverUrl = $("set-server").value.trim();
+  settings.refreshSec = parseInt($("set-refresh").value, 10);
+  localStorage.setItem("settings.serverUrl", settings.serverUrl);
+  localStorage.setItem("settings.refreshSec", String(settings.refreshSec));
+  scheduleRefresh();
+  toast("Einstellungen gespeichert");
 });
 
 /* ------------------------------------------------------------- start-up */

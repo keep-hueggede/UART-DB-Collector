@@ -99,7 +99,7 @@ Pfad; fehlt die Datei, bricht der Start ab.
 
 Google-Login und Sitzungsdauer stehen **nicht** mehr in der `app.config`,
 sondern in der Datenbank (Tabelle `Settings`) und werden bei der
-Ersteinrichtung bzw. spaeter unter *Verwalten -> Server* gepflegt. Alte
+Ersteinrichtung bzw. spaeter unter *Administration -> Server* (Zahnrad oben rechts) gepflegt. Alte
 `GOOGLE.*`-Werte werden beim ersten Start einmalig uebernommen und koennen danach
 aus der Datei entfernt werden.
 
@@ -216,7 +216,7 @@ bestehenden `ORMapper` (Hibernate) aus der Datenbank.
 1. Phone und Server im selben Netzwerk (bzw. Server im Internet).
 2. Am Phone oeffnen: `http://<server-ip>:8080`
 3. Mit Google anmelden.
-4. Ein Administrator weist dem Konto unter *Verwalten* die Feldgeraete zu.
+4. Ein Administrator weist dem Konto unter *Administration* (Zahnrad) die Feldgeraete zu.
    Bis dahin zeigt die App nur einen Hinweis.
 5. "Zum Home-Screen hinzufuegen" -> laeuft dann wie eine App (PWA, offline-faehig
    via Service Worker, Auto-Aktualisierung, Verlauf-Charts je Sensor).
@@ -225,8 +225,11 @@ Die Edge-Devices schreiben weiterhin **alle** erreichbaren Geraete in die
 Datenbank; welche ein Benutzer sieht, entscheidet allein die Zuweisung durch
 einen Administrator.
 
-Einstellungen (Zahnrad): Server-URL ueberschreiben (noetig nur, wenn die App
-anderswo heraufgeladen wird) und Auto-Aktualisierungs-Intervall.
+Das Zahnrad oben rechts sehen nur Administratoren. Es oeffnet die Seite
+*Administration* mit den Bereichen *Benutzer* (Freigabe, Geraete zuweisen,
+Rollen), *Server* (Google-Login, Sitzungsdauer) und *App* (Auto-Aktualisierung
+und Server-URL fuer die native App, nur fuer das eigene Geraet). Benutzer
+aktualisieren automatisch alle 30 s.
 
 ### Ersteinrichtung und erster Administrator
 
@@ -258,7 +261,7 @@ ohne Admin die Einrichtung erneut.
 | Geraete umbenennen, Korrekturwerte | – | ja |
 | Benutzer freigeben, Geraete zuweisen | – | ja |
 | Andere zu Administratoren machen | – | ja (der letzte Admin kann nicht entzogen werden) |
-| Google-Login, Sitzungsdauer aendern | – | ja (*Verwalten -> Server*) |
+| Google-Login, Sitzungsdauer aendern | – | ja (*Administration -> Server*) |
 
 Neue Google-Konten werden beim ersten Login als Benutzer ohne Geraete angelegt.
 Rollenaenderungen gelten sofort, auch fuer bestehende Sitzungen.

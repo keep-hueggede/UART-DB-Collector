@@ -10,7 +10,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
   <header class="topbar">
@@ -34,7 +34,7 @@
       <button id="btn-refresh" class="icon-btn" aria-label="Aktualisieren">
         <svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4z" fill="currentColor"/></svg>
       </button>
-      <button id="btn-settings" class="icon-btn" aria-label="Einstellungen">
+      <button id="btn-settings" class="icon-btn admin-only" aria-label="Administration" title="Administration">
         <svg viewBox="0 0 24 24"><path d="M19.14 12.94a7.07 7.07 0 0 0 0-1.88l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96a7.03 7.03 0 0 0-1.62-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54c-.58.24-1.12.55-1.62.94l-2.39-.96a.5.5 0 0 0-.61.22L2.63 8.84a.5.5 0 0 0 .12.64l2.03 1.58a7.07 7.07 0 0 0 0 1.88l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.31.61.22l2.39-.96c.5.39 1.04.7 1.62.94l.36 2.54c.04.24.25.42.5.42h3.84c.25 0 .46-.18.5-.42l.36-2.54c.58-.24 1.12-.55 1.62-.94l2.39.96c.22.09.48 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.64zM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5z" fill="currentColor"/></svg>
       </button>
     </div>
@@ -44,7 +44,6 @@
     <section id="view-dashboard">
       <div class="section-head" id="devices-head">
         <h2 class="section-title">Geräte</h2>
-        <button id="btn-admin" class="text-btn admin-only">Verwalten</button>
       </div>
       <div id="devices" class="device-list"></div>
       <div class="section-head">
@@ -93,6 +92,62 @@
         <div class="stat"><span class="stat-label">Werte</span><span id="stat-count">–</span></div>
       </div>
     </section>
+
+    <!-- only rendered for admins; the API answers 403 to everybody else -->
+    <section id="view-admin" class="hidden">
+      <button id="btn-admin-back" class="back-btn">
+        <svg viewBox="0 0 24 24"><path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z" fill="currentColor"/></svg>
+        Zurück
+      </button>
+      <h2 class="admin-title">Administration</h2>
+      <div class="range-tabs admin-tabs" id="admin-tabs">
+        <button data-tab="users" class="active">Benutzer</button>
+        <button data-tab="server">Server</button>
+        <button data-tab="app">App</button>
+      </div>
+
+      <div id="admin-users" class="admin-tab">
+        <p class="hint">Benutzer sehen nur die Feldgeräte, die du ihnen zuweist.
+          Administratoren sehen alles und können Geräte umbenennen, Korrekturwerte setzen und Einstellungen ändern.</p>
+        <div id="admin-user-list" class="dev-list"></div>
+      </div>
+
+      <form id="admin-server" class="admin-tab admin-panel hidden" autocomplete="off">
+        <h3>Google-Login</h3>
+        <label for="adm-client-id">Client-ID</label>
+        <input id="adm-client-id" type="text" spellcheck="false">
+        <label for="adm-client-secret">Clientschlüssel</label>
+        <input id="adm-client-secret" type="password" spellcheck="false" autocomplete="new-password"
+               placeholder="leer = unverändert">
+        <label for="adm-redirect">Weiterleitungs-URI</label>
+        <input id="adm-redirect" type="text" spellcheck="false" placeholder="leer = aus der Anfrage ableiten">
+        <p class="hint">Muss exakt so in der Google Cloud Console eingetragen sein, z.B.
+          <code>https://example.org/auth/callback</code>.</p>
+        <h3>Sitzungen</h3>
+        <label for="adm-ttl">Anmeldung gültig (Tage)</label>
+        <input id="adm-ttl" type="number" min="1" max="365" step="1" required>
+        <div class="panel-actions">
+          <button type="submit" class="primary-btn">Speichern</button>
+        </div>
+      </form>
+
+      <form id="admin-app" class="admin-tab admin-panel hidden" autocomplete="off">
+        <p class="hint">Gilt nur für diesen Browser bzw. dieses Gerät.</p>
+        <label for="set-refresh">Auto-Aktualisierung</label>
+        <select id="set-refresh">
+          <option value="0">aus</option>
+          <option value="10">10 s</option>
+          <option value="30">30 s</option>
+          <option value="60">60 s</option>
+        </select>
+        <label for="set-server">Server-URL</label>
+        <input id="set-server" type="text" inputmode="url" placeholder="leer = aktuelle Seite">
+        <p class="hint">Nur für die native App auf dem Phone: z.B. <code>https://sh.example.org</code></p>
+        <div class="panel-actions">
+          <button type="submit" class="primary-btn">Speichern</button>
+        </div>
+      </form>
+    </section>
   </main>
 
   <!-- ------------------------------------------------------ login screen -->
@@ -116,7 +171,7 @@
       <p id="login-error" class="hint hint-err hidden">Anmeldung abgebrochen oder fehlgeschlagen. Bitte erneut versuchen.</p>
       <p id="login-config-hint" class="hint hidden">
         Der Google-Login ist auf dem Server noch nicht konfiguriert.<br>
-        Ein Administrator kann ihn unter „Verwalten → Server“ eintragen.
+        Ein Administrator kann ihn unter „Administration → Server“ (Zahnrad) eintragen.
       </p>
       <p class="hint">Daten sind erst sichtbar, wenn ein Administrator dir Feldgeräte zugewiesen hat.</p>
     </div>
@@ -158,50 +213,13 @@
       <div class="setup-step">
         <h2>3. Administrator werden</h2>
         <p>Das Google-Konto, mit dem du dich gleich anmeldest, wird Administrator. Weitere Benutzer
-          kannst du danach unter „Verwalten“ freigeben oder zu Administratoren machen.</p>
+          kannst du danach über das Zahnrad oben rechts freigeben oder zu Administratoren machen.</p>
       </div>
 
       <button type="submit" class="primary-btn setup-submit">Speichern und mit Google anmelden</button>
       <p id="setup-error" class="hint hint-err hidden"></p>
     </form>
   </div>
-
-  <!-- --------------------------------------------------------- admin -->
-
-  <dialog id="admin-dialog" class="wide-dialog">
-    <h2>Verwalten</h2>
-    <div class="range-tabs admin-tabs" id="admin-tabs">
-      <button data-tab="users" class="active">Benutzer</button>
-      <button data-tab="server">Server</button>
-    </div>
-
-    <div id="admin-users">
-      <p class="hint">Benutzer sehen nur die Feldgeräte, die du ihnen zuweist.
-        Administratoren sehen alles und können Geräte umbenennen, Korrekturwerte setzen und Einstellungen ändern.</p>
-      <div id="admin-user-list" class="dev-list"></div>
-    </div>
-
-    <form id="admin-server" class="hidden" autocomplete="off">
-      <label for="adm-client-id">Google Client-ID</label>
-      <input id="adm-client-id" type="text" spellcheck="false">
-      <label for="adm-client-secret">Google Clientschlüssel</label>
-      <input id="adm-client-secret" type="password" spellcheck="false" autocomplete="new-password"
-             placeholder="leer = unverändert">
-      <label for="adm-redirect">Weiterleitungs-URI</label>
-      <input id="adm-redirect" type="text" spellcheck="false" placeholder="leer = aus der Anfrage ableiten">
-      <p class="hint">Muss exakt so in der Google Cloud Console eingetragen sein, z.B.
-        <code>https://example.org/auth/callback</code>.</p>
-      <label for="adm-ttl">Anmeldung gültig (Tage)</label>
-      <input id="adm-ttl" type="number" min="1" max="365" step="1" required>
-      <div class="dialog-actions">
-        <button type="submit">Speichern</button>
-      </div>
-    </form>
-
-    <div class="dialog-actions">
-      <button id="btn-close-admin" class="secondary">Schließen</button>
-    </div>
-  </dialog>
 
   <dialog id="rename-dialog">
     <form method="dialog" id="rename-form">
@@ -233,29 +251,7 @@
     </form>
   </dialog>
 
-  <!-- -------------------------------------------------------- settings -->
-
-  <dialog id="settings-dialog">
-    <form method="dialog" id="settings-form">
-      <h2>Einstellungen</h2>
-      <label for="set-server">Server-URL</label>
-      <input id="set-server" type="text" inputmode="url" placeholder="leer = aktuelle Seite">
-      <p class="hint">Für die native App auf dem Phone: z.B. <code>http://192.168.1.10:8080</code></p>
-      <label for="set-refresh">Auto-Aktualisierung</label>
-      <select id="set-refresh">
-        <option value="0">aus</option>
-        <option value="10">10 s</option>
-        <option value="30">30 s</option>
-        <option value="60">60 s</option>
-      </select>
-      <div class="dialog-actions">
-        <button value="cancel" class="secondary">Abbrechen</button>
-        <button value="save" id="btn-save-settings">Speichern</button>
-      </div>
-    </form>
-  </dialog>
-
   <div id="toast" class="toast hidden"></div>
-  <script src="app.js"></script>
+  <script src="app.js?v=7"></script>
 </body>
 </html>
