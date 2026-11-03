@@ -33,6 +33,12 @@ jobs:
     - name: Build and run unit tests
       run: mvn -B verify --file pom.xml
 
+    - name: Check jar manifests
+      run: |
+        for j in collector/target/uart-db-collector.jar webserver/target/uart-db-webserver.jar; do
+          unzip -p "$j" META-INF/MANIFEST.MF | grep -q "Multi-Release: true" || { echo "$j is not Multi-Release"; exit 1; }
+        done
+
     - name: Test summary
       if: always()
       run: |
