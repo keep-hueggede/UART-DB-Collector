@@ -1,0 +1,14 @@
+# User service on the Pi: updates the collector from the latest GitHub release
+# (started by uart-db-collector-update.timer). Install (no root needed):
+#   install -D -m 755 uart-db-update.sh ~/.local/bin/uart-db-update
+#   cp uart-db-collector-update.service uart-db-collector-update.timer ~/.config/systemd/user/
+#   systemctl --user daemon-reload && systemctl --user enable --now uart-db-collector-update.timer
+# Logs: journalctl --user -u uart-db-collector-update (or systemctl --user status ...)
+
+[Unit]
+Description=Update UART-DB-Collector from the latest GitHub release
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/uart-db-update --collector

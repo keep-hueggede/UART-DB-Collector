@@ -365,6 +365,40 @@ laeuft der Collector weiter: UART-Zeilen landen in `./spool/pending.log` und
 werden alle 30 s nachgetragen, sobald die Verbindung wieder steht. Logs:
 `tail -f ~/app/collector.log`.
 
+### Updates des Collectors
+
+Wie beim Webserver (siehe *Releases und Updates*), nur als normaler Benutzer
+ohne `sudo`. Einmalig einrichten:
+
+```bash
+install -D -m 755 deploy/uart-db-update.sh ~/.local/bin/uart-db-update
+```
+
+Danach:
+
+```bash
+uart-db-update --collector --check   # installierte und neueste Version
+uart-db-update --collector           # neueste Version installieren
+uart-db-update --collector v1.0.1    # bestimmte Version (auch zurueck)
+```
+
+Das Skript prueft die SHA-256-Summe, behaelt das alte Jar als `.bak` und startet
+`uart-db-collector` neu. Laeuft der Dienst danach nicht 20 s ohne Neustart
+(z.B. weil das neue Jar beim Start abbricht), wird das alte Jar
+zurueckgespielt. Abweichende Pfade in `~/.config/uart-db-update.conf`, z.B.
+`APP_DIR=/home/pi/collector`.
+
+Optional automatisch jede Nacht (Benutzer-Timer, `enable-linger` ist schon
+gesetzt):
+
+```bash
+cp deploy/uart-db-collector-update.service deploy/uart-db-collector-update.timer ~/.config/systemd/user/
+systemctl --user daemon-reload && systemctl --user enable --now uart-db-collector-update.timer
+```
+
+Collector und Webserver aus demselben Release betreiben: beide Timer laufen
+nachts, im Zweifel beide von Hand aktualisieren.
+
 ## Getrennter Betrieb: Collector auf dem Pi, Web-App im Internet
 
 ```

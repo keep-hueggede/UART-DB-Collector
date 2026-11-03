@@ -1,0 +1,12 @@
+# Optional: installs new collector releases automatically every night.
+
+[Unit]
+Description=Nightly update of UART-DB-Collector
+
+[Timer]
+OnCalendar=*-*-* 04:30
+RandomizedDelaySec=30min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
