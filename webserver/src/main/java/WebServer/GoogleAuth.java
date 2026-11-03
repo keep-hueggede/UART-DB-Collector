@@ -38,12 +38,22 @@ public class GoogleAuth {
     private record Client(String id, String secret, String redirectUri) {}
 
     private volatile Client client;
+    private final URI tokenEndpoint;
+    private final URI userinfoEndpoint;
 
     // created on first login, so an unconfigured server opens no client sockets
     private HttpClient http;
     private final ObjectMapper json = new ObjectMapper();
 
     public GoogleAuth(String clientId, String clientSecret, String configuredRedirectUri) {
+        this(clientId, clientSecret, configuredRedirectUri, TOKEN_ENDPOINT, USERINFO_ENDPOINT);
+    }
+
+    /** With other token/userinfo endpoints (tests use a local stub instead of Google). */
+    public GoogleAuth(String clientId, String clientSecret, String configuredRedirectUri,
+                      String tokenEndpoint, String userinfoEndpoint) {
+        this.tokenEndpoint = URI.create(tokenEndpoint);
+        this.userinfoEndpoint = URI.create(userinfoEndpoint);
         configure(clientId, clientSecret, configuredRedirectUri);
     }
 
@@ -110,7 +120,7 @@ public class GoogleAuth {
                 + "&redirect_uri=" + enc(redirectUri)
                 + "&grant_type=authorization_code";
 
-        HttpRequest req = HttpRequest.newBuilder(URI.create(TOKEN_ENDPOINT))
+        HttpRequest req = HttpRequest.newBuilder(tokenEndpoint)
                 .timeout(Duration.ofSeconds(15))
                 .header("Content-Type", "application/x-www-form-urlencoded")
                 .POST(HttpRequest.BodyPublishers.ofString(body))
@@ -150,7 +160,7 @@ public class GoogleAuth {
     }
 
     private GoogleUser userinfo(String accessToken) throws IOException, InterruptedException {
-        HttpRequest req = HttpRequest.newBuilder(URI.create(USERINFO_ENDPOINT))
+        HttpRequest req = HttpRequest.newBuilder(userinfoEndpoint)
                 .timeout(Duration.ofSeconds(15))
                 .header("Authorization", "Bearer " + accessToken)
                 .GET()
