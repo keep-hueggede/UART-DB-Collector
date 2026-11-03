@@ -487,6 +487,23 @@ alte Jar als `.bak`, startet den Dienst neu und wartet auf `/api/health`. Kommt
 der Dienst nicht hoch, wird das alte Jar automatisch zurueckgespielt. Die
 installierte Version steht in `.release` im Anwendungsverzeichnis.
 
+**Datenbank-Sicherung:** Vor dem Austausch des Jars (also bevor Hibernate das
+Schema anpasst) sichert das Skript die MySQL-Datenbank aus der `app.config`
+mit `mysqldump` nach `/var/backups/uart-db/<DB.NAME>-<Datum>-<alte Version>.sql.gz`
+(Rechte `600`, die neuesten 14 bleiben). Schlaegt die Sicherung fehl, wird
+nicht aktualisiert. Das Passwort landet nur in einer temporaeren
+Optionsdatei, nie auf der Kommandozeile.
+
+```bash
+sudo uart-db-update --backup       # nur sichern
+sudo uart-db-update --no-backup    # ohne Sicherung aktualisieren
+zcat /var/backups/uart-db/SmartHome-<...>.sql.gz | mysql -u <user> -p   # zuruecksichern
+```
+
+Voraussetzung: `mysqldump` (bei installiertem MySQL-Server vorhanden, sonst
+`apt install default-mysql-client`). Anpassbar in `/etc/default/uart-db-update`:
+`BACKUP_DIR`, `BACKUP_KEEP`, `BACKUP=0` (abschalten).
+
 Optional automatisch jede Nacht:
 
 ```bash
