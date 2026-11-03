@@ -21,7 +21,7 @@ CONF=${CONF:-/etc/default/uart-db-update}
 [ -f "$CONF" ] && . "$CONF"
 
 REPO=${REPO:-keep-hueggede/UART-DB-Collector}
-APP_DIR=${APP_DIR:-/opt/uart-db}
+APP_DIR=${APP_DIR:-/var/www/sh.rwx-dev.de}
 JAR=${JAR:-uart-db-webserver.jar}
 SERVICE=${SERVICE:-uart-db-webserver}
 HEALTH_URL=${HEALTH_URL:-auto}       # "auto": port from app.config, "" = only check the service

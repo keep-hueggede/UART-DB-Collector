@@ -238,7 +238,7 @@ Einmal-Code in `setup-code.txt` in seinem Arbeitsverzeichnis (Rechte `600`)
 und meldet den Pfad im Log. Wer die Seite dann aufruft, landet auf der
 Einrichtungsseite:
 
-1. Code aus der Datei eintragen, z.B. `cat /opt/uart-db/setup-code.txt` (`WorkingDirectory` des Dienstes).
+1. Code aus der Datei eintragen, z.B. `cat /var/www/sh.rwx-dev.de/setup-code.txt` (`WorkingDirectory` des Dienstes).
    Damit ist nachgewiesen, dass man Zugriff auf das Server-Verzeichnis hat -
    Root-Rechte sind nicht noetig.
 2. In der [Google Cloud Console](https://console.cloud.google.com/apis/credentials)

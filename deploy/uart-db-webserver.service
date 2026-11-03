@@ -1,9 +1,9 @@
 # systemd system service for the web server (webserver/target/uart-db-webserver.jar)
 # on an internet server, behind a reverse proxy with HTTPS (e.g. Caddy or nginx).
 # Install (as root):
-#   useradd --system --home /opt/uart-db --shell /usr/sbin/nologin uartdb
-#   mkdir -p /opt/uart-db && cp uart-db-webserver.jar app.config /opt/uart-db/
-#   chown -R uartdb: /opt/uart-db && chmod 600 /opt/uart-db/app.config
+#   useradd --system --home /var/www/sh.rwx-dev.de --shell /usr/sbin/nologin uartdb
+#   mkdir -p /var/www/sh.rwx-dev.de && cp uart-db-webserver.jar app.config /var/www/sh.rwx-dev.de/
+#   chown -R uartdb: /var/www/sh.rwx-dev.de && chmod 600 /var/www/sh.rwx-dev.de/app.config
 #   cp uart-db-webserver.service /etc/systemd/system/
 #   systemctl daemon-reload && systemctl enable --now uart-db-webserver
 # Logs: journalctl -u uart-db-webserver -f
@@ -16,8 +16,8 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=uartdb
-WorkingDirectory=/opt/uart-db
-ExecStart=/usr/bin/java -jar /opt/uart-db/uart-db-webserver.jar
+WorkingDirectory=/var/www/sh.rwx-dev.de
+ExecStart=/usr/bin/java -jar /var/www/sh.rwx-dev.de/uart-db-webserver.jar
 Restart=always
 RestartSec=10
 SuccessExitStatus=143
@@ -27,7 +27,7 @@ NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
-ReadWritePaths=/opt/uart-db
+ReadWritePaths=/var/www/sh.rwx-dev.de
 
 [Install]
 WantedBy=multi-user.target
