@@ -101,6 +101,24 @@
                     </execution>
                 </executions>
             </plugin>
+            <!-- SBOM (CycloneDX): per module target/bom.json, whole project target/sbom.cdx.json -->
+            <plugin>
+                <groupId>org.cyclonedx</groupId>
+                <artifactId>cyclonedx-maven-plugin</artifactId>
+                <version>2.9.1</version>
+                <configuration>
+                    <projectType>application</projectType>
+                    <outputFormat>json</outputFormat>
+                    <outputName>sbom.cdx</outputName>
+                    <includeTestScope>false</includeTestScope>
+                </configuration>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals><goal>makeAggregateBom</goal></goals>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
         <pluginManagement>
             <plugins>
