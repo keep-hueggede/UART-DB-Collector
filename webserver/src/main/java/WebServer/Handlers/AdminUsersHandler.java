@@ -6,17 +6,17 @@ import WebServer.Http.HttpCall;
 
 import java.io.IOException;
 
-/** GET /api/devices/available - devices the user can still link (identity only). */
-public class AvailableDevicesHandler implements Handler {
+/** GET /api/admin/users (admin) - all accounts with role and assigned device ids. */
+public class AdminUsersHandler implements Handler {
 
     private final Repositories repos;
 
-    public AvailableDevicesHandler(Repositories repos) {
+    public AdminUsersHandler(Repositories repos) {
         this.repos = repos;
     }
 
     @Override
     public void handle(HttpCall call) throws IOException {
-        call.json(200, repos.devices().listAvailable(call.user().userId));
+        call.json(200, repos.users().listAll());
     }
 }

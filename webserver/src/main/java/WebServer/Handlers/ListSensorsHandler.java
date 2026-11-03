@@ -17,6 +17,6 @@ public class ListSensorsHandler implements Handler {
 
     @Override
     public void handle(HttpCall call) throws IOException {
-        call.json(200, repos.sensors().listLinked(call.user().userId));
+        call.json(200, repos.sensors().listVisible(call.viewer()));
     }
 }

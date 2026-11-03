@@ -24,10 +24,10 @@ public class MeasurementRepository {
     }
 
     /** Latest measurement per owned sensor, including sensor + device metadata. */
-    public List<Map<String, Object>> latest(int userId) {
+    public List<Map<String, Object>> latest(Viewer viewer) {
         return mapper.readInSession(session -> {
             List<Map<String, Object>> out = new ArrayList<>();
-            for (Sensor s : Ownership.ownedSensors(session, userId)) {
+            for (Sensor s : Ownership.ownedSensors(session, viewer)) {
                 Measurement latest = session.createQuery(
                                 "FROM Measurement m WHERE m.sensor.id = :sid "
                                         + "ORDER BY m.timestamp DESC, m.id DESC",
@@ -56,9 +56,9 @@ public class MeasurementRepository {
      * that to 404 so unowned ids cannot be enumerated).
      * from/to are epoch millis (nullable), limit caps the returned points.
      */
-    public Map<String, Object> series(int userId, int sensorId, Long from, Long to, int limit) {
+    public Map<String, Object> series(Viewer viewer, int sensorId, Long from, Long to, int limit) {
         return mapper.readInSession(session -> {
-            if (!Ownership.ownsSensor(session, userId, sensorId)) return null;
+            if (!Ownership.ownsSensor(session, viewer, sensorId)) return null;
             Sensor sensor = session.get(Sensor.class, sensorId);
             if (sensor == null) return null;
 

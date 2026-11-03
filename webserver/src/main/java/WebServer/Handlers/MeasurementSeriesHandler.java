@@ -1,6 +1,7 @@
 package WebServer.Handlers;
 
 import Repository.Repositories;
+import Repository.Viewer;
 import WebServer.Http.Handler;
 import WebServer.Http.HttpCall;
 
@@ -46,13 +47,13 @@ public class MeasurementSeriesHandler implements Handler {
                 return;
             }
         }
-        int userId = call.user().userId;
-        Map<String, Object> out = repos.measurements().series(userId, sid, from, to, limit);
+        Viewer viewer = call.viewer();
+        Map<String, Object> out = repos.measurements().series(viewer, sid, from, to, limit);
         if (out == null) {
             call.error(404, "not found");
             return;
         }
-        out.put("sensor", repos.sensors().findLinked(userId, sid));
+        out.put("sensor", repos.sensors().findVisible(viewer, sid));
         call.json(200, out);
     }
 }

@@ -17,6 +17,6 @@ public class LatestMeasurementsHandler implements Handler {
 
     @Override
     public void handle(HttpCall call) throws IOException {
-        call.json(200, repos.measurements().latest(call.user().userId));
+        call.json(200, repos.measurements().latest(call.viewer()));
     }
 }

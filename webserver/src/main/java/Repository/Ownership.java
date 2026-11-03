@@ -9,8 +9,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Queries and mappings shared by the repositories. Data of a field device is
- * only visible to a user who has linked that device (UserDevice relation).
+ * Queries and mappings shared by the repositories. Admins see every device;
+ * a user only sees devices an admin assigned to them (UserDevice relation).
  */
 final class Ownership {
 
@@ -23,28 +23,38 @@ final class Ownership {
     static final String OWNS_DEVICE =
             "SELECT COUNT(ud) FROM UserDevice ud WHERE ud.user.id = :uid AND ud.device.id = :did";
 
-    static boolean ownsSensor(Session session, int userId, int sensorId) {
+    static boolean ownsSensor(Session session, Viewer viewer, int sensorId) {
+        if (viewer.admin()) return true;
         return session.createQuery(OWNS_SENSOR, Long.class)
-                .setParameter("uid", userId)
+                .setParameter("uid", viewer.userId())
                 .setParameter("sid", sensorId)
                 .getSingleResult() > 0L;
     }
 
-    static boolean ownsDevice(Session session, int userId, int deviceId) {
+    static boolean ownsDevice(Session session, Viewer viewer, int deviceId) {
+        return viewer.admin() || isAssigned(session, viewer.userId(), deviceId);
+    }
+
+    /** The actual UserDevice relation, regardless of role. */
+    static boolean isAssigned(Session session, int userId, int deviceId) {
         return session.createQuery(OWNS_DEVICE, Long.class)
                 .setParameter("uid", userId)
                 .setParameter("did", deviceId)
                 .getSingleResult() > 0L;
     }
 
-    static List<Sensor> ownedSensors(Session session, int userId) {
+    static List<Sensor> ownedSensors(Session session, Viewer viewer) {
+        if (viewer.admin()) {
+            return session.createQuery("SELECT s FROM Sensor s JOIN FETCH s.device d ORDER BY d.name, s.sensorType",
+                    Sensor.class).getResultList();
+        }
         return session.createQuery(
                         "SELECT s FROM Sensor s JOIN FETCH s.device d WHERE EXISTS ("
                                 + "SELECT ud.id FROM UserDevice ud "
                                 + "WHERE ud.user.id = :uid AND ud.device = d) "
                                 + "ORDER BY d.name, s.sensorType",
                         Sensor.class)
-                .setParameter("uid", userId)
+                .setParameter("uid", viewer.userId())
                 .getResultList();
     }
 

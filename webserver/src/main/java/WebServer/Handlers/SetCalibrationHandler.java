@@ -53,7 +53,7 @@ public class SetCalibrationHandler implements Handler {
                     + " (or negative), offset at most " + MAX_ABS_OFFSET);
             return;
         }
-        if (!repos.sensors().setCalibration(call.user().userId, id, factor, offset)) {
+        if (!repos.sensors().setCalibration(call.viewer(), id, factor, offset)) {
             call.error(404, "not found");
             return;
         }

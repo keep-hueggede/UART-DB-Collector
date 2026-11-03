@@ -14,10 +14,21 @@ import java.util.Map;
  */
 public final class Router {
 
-    private record Route(String method, String[] segments, int wildcards, Handler handler, boolean isPublic) {}
+    /** Who may call a route; checked centrally by the web server before dispatch. */
+    public enum Access { PUBLIC, USER, ADMIN }
+
+    private record Route(String method, String[] segments, int wildcards, Handler handler, Access access) {}
 
     /** Result of a lookup: a handler, or the status to answer with (404/405). */
-    public record Match(Handler handler, Map<String, String> params, int status, boolean isPublic) {
+    public record Match(Handler handler, Map<String, String> params, int status, Access access) {
+
+        public boolean isPublic() {
+            return access == Access.PUBLIC;
+        }
+
+        public boolean isAdminOnly() {
+            return access == Access.ADMIN;
+        }
 
         /** Runs the handler or answers 404 (with the given message) / 405. */
         public void dispatch(HttpCall call, String notFoundMessage) throws IOException {
@@ -35,31 +46,40 @@ public final class Router {
     private final List<Route> routes = new ArrayList<>();
 
     public Router get(String pattern, Handler handler) {
-        return add("GET", pattern, handler, false);
-    }
-
-    /** GET route that needs no login (e.g. liveness check). */
-    public Router publicGet(String pattern, Handler handler) {
-        return add("GET", pattern, handler, true);
+        return add("GET", pattern, handler, Access.USER);
     }
 
     public Router post(String pattern, Handler handler) {
-        return add("POST", pattern, handler, false);
+        return add("POST", pattern, handler, Access.USER);
     }
 
     public Router put(String pattern, Handler handler) {
-        return add("PUT", pattern, handler, false);
+        return add("PUT", pattern, handler, Access.USER);
     }
 
     public Router delete(String pattern, Handler handler) {
-        return add("DELETE", pattern, handler, false);
+        return add("DELETE", pattern, handler, Access.USER);
     }
 
-    private Router add(String method, String pattern, Handler handler, boolean isPublic) {
+    /** Route that needs no login (e.g. liveness check, first-run setup). */
+    public Router publicRoute(String method, String pattern, Handler handler) {
+        return add(method, pattern, handler, Access.PUBLIC);
+    }
+
+    public Router publicGet(String pattern, Handler handler) {
+        return publicRoute("GET", pattern, handler);
+    }
+
+    /** Route only for admins (403 for other users). */
+    public Router admin(String method, String pattern, Handler handler) {
+        return add(method, pattern, handler, Access.ADMIN);
+    }
+
+    private Router add(String method, String pattern, Handler handler, Access access) {
         String[] segments = pattern.split("/", -1);
         int wildcards = 0;
         for (String s : segments) if (isPlaceholder(s)) wildcards++;
-        routes.add(new Route(method, segments, wildcards, handler, isPublic));
+        routes.add(new Route(method, segments, wildcards, handler, access));
         return this;
     }
 
@@ -79,11 +99,11 @@ public final class Router {
             }
             pathKnown = true;
             if (found == null && r.method.equals(method)) {
-                found = new Match(r.handler, params, 200, r.isPublic);
+                found = new Match(r.handler, params, 200, r.access);
             }
         }
         if (found != null) return found;
-        return new Match(null, Map.of(), pathKnown ? 405 : 404, false);
+        return new Match(null, Map.of(), pathKnown ? 405 : 404, Access.USER);
     }
 
     private static Map<String, String> bind(String[] pattern, String[] parts) {

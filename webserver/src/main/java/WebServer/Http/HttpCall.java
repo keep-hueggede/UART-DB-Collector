@@ -1,5 +1,6 @@
 package WebServer.Http;
 
+import Repository.Viewer;
 import WebServer.SessionManager;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,6 +28,7 @@ public final class HttpCall {
     private Map<String, String> params = Map.of();
     private Map<String, String> query;
     private SessionManager.Session user;
+    private boolean admin;
 
     public HttpCall(HttpExchange ex) {
         this.ex = ex;
@@ -61,7 +63,12 @@ public final class HttpCall {
 
     /** Numeric {id} path parameter, or null when it is not a number (caller answers 404). */
     public Integer pathId() {
-        String value = param("id");
+        return pathInt("id");
+    }
+
+    /** Numeric path parameter by name, or null when it is not a number (caller answers 404). */
+    public Integer pathInt(String name) {
+        String value = param(name);
         if (value == null || !value.matches("\\d+")) return null;
         try {
             return Integer.parseInt(value);
@@ -82,6 +89,19 @@ public final class HttpCall {
 
     public void setUser(SessionManager.Session user) {
         this.user = user;
+    }
+
+    public void setAdmin(boolean admin) {
+        this.admin = admin;
+    }
+
+    public boolean isAdmin() {
+        return admin;
+    }
+
+    /** The authenticated user with role, for data scoping in the repositories. */
+    public Viewer viewer() {
+        return new Viewer(user.userId, admin);
     }
 
     /** Scheme as seen by the client (reverse proxy sets X-Forwarded-Proto). */

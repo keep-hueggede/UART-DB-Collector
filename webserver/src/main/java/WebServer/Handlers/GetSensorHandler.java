@@ -19,7 +19,7 @@ public class GetSensorHandler implements Handler {
     @Override
     public void handle(HttpCall call) throws IOException {
         Integer id = call.pathId();
-        Map<String, Object> sensor = id == null ? null : repos.sensors().findLinked(call.user().userId, id);
+        Map<String, Object> sensor = id == null ? null : repos.sensors().findVisible(call.viewer(), id);
         if (sensor == null) {
             call.error(404, "not found");
             return;

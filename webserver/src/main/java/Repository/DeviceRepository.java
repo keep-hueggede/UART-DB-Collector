@@ -12,12 +12,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Field devices and the user-device links. */
+/** Field devices and their assignment to users (by an admin). */
 public class DeviceRepository {
 
     public enum RenameResult { OK, NOT_FOUND, NAME_TAKEN }
 
-    private static final int MAX_NAME_LENGTH = 100;
+    public enum AssignResult { OK, USER_NOT_FOUND, DEVICE_NOT_FOUND }
 
     private final ORMapper mapper;
 
@@ -31,16 +31,24 @@ public class DeviceRepository {
                 session.createQuery("SELECT COUNT(d) FROM Device d", Long.class).getSingleResult());
     }
 
-    /** Devices linked to this user (with sensor count + latest measurement). */
-    public List<Map<String, Object>> listLinked(int userId) {
+    /** Number of devices assigned to a user (0 = waiting for approval). */
+    public long countAssigned(int userId) {
+        return mapper.readInSession(session -> session.createQuery(
+                        "SELECT COUNT(ud) FROM UserDevice ud WHERE ud.user.id = :uid", Long.class)
+                .setParameter("uid", userId).getSingleResult());
+    }
+
+    /** Devices the viewer may see (admin: all) with sensor count + latest measurement. */
+    public List<Map<String, Object>> listVisible(Viewer viewer) {
         return mapper.readInSession(session -> {
-            List<Object[]> rows = session.createQuery(
-                            "SELECT d, COUNT(DISTINCT s), MAX(m.timestamp) FROM UserDevice ud "
-                                    + "JOIN ud.device d LEFT JOIN d.sensors s LEFT JOIN s.measurements m "
-                                    + "WHERE ud.user.id = :uid GROUP BY d",
-                            Object[].class)
-                    .setParameter("uid", userId)
-                    .getResultList();
+            String select = "SELECT d, COUNT(DISTINCT s), MAX(m.timestamp) ";
+            String joins = "LEFT JOIN d.sensors s LEFT JOIN s.measurements m ";
+            List<Object[]> rows = viewer.admin()
+                    ? session.createQuery(select + "FROM Device d " + joins + "GROUP BY d", Object[].class)
+                        .getResultList()
+                    : session.createQuery(select + "FROM UserDevice ud JOIN ud.device d " + joins
+                                    + "WHERE ud.user.id = :uid GROUP BY d", Object[].class)
+                        .setParameter("uid", viewer.userId()).getResultList();
             List<Map<String, Object>> list = new ArrayList<>();
             for (Object[] row : rows) {
                 Device d = (Device) row[0];
@@ -61,80 +69,22 @@ public class DeviceRepository {
         });
     }
 
-    /**
-     * Devices NOT yet linked to this user, so they can be added.
-     * Exposes identity only (name/type/online) - never measurement values.
-     */
-    public List<Map<String, Object>> listAvailable(int userId) {
-        return mapper.readInSession(session -> {
-            List<Device> devices = session.createQuery(
-                            "SELECT d FROM Device d WHERE NOT EXISTS ("
-                                    + "SELECT ud.id FROM UserDevice ud "
-                                    + "WHERE ud.user.id = :uid AND ud.device.id = d.id) "
-                                    + "ORDER BY d.name",
-                            Device.class)
-                    .setParameter("uid", userId)
-                    .getResultList();
-            List<Map<String, Object>> out = new ArrayList<>();
-            for (Device d : devices) {
-                Map<String, Object> m = new LinkedHashMap<>();
-                m.put("id", d.getId());
-                m.put("name", d.getName());
-                m.put("deviceType", d.getDeviceType() == null ? null : d.getDeviceType().name());
-                m.put("online", d.isOnline());
-                out.add(m);
-            }
-            return out;
-        });
-    }
-
-    /**
-     * Links a device to the user. Either an existing deviceId or a device
-     * name is required; an unknown name creates the device (the collector
-     * will fill it once the edge device reports that src name).
-     * Returns the device map, or null if nothing matched.
-     */
-    public Map<String, Object> link(int userId, Integer deviceId, String name) {
-        String cleanName = (name == null || name.isBlank()) ? null : name.trim();
-        if (deviceId == null && cleanName == null) return null;
-        if (cleanName != null && !isValidName(cleanName)) {
-            throw new IllegalArgumentException("invalid device name");
-        }
-
+    /** Gives a user access to a device (idempotent). */
+    public AssignResult assign(int userId, int deviceId) {
         return mapper.writeInSession(session -> {
-            Device device;
-            boolean created = false;
-            if (deviceId != null) {
-                device = session.get(Device.class, deviceId);
-                if (device == null) return null;
-            } else {
-                device = session.createQuery("FROM Device d WHERE d.name = :name", Device.class)
-                        .setParameter("name", cleanName)
-                        .uniqueResult();
-                if (device == null) {
-                    device = new Device(cleanName, Device.DeviceType.SENSOR, "unknown");
-                    session.persist(device);
-                    created = true;
-                }
-            }
-
-            if (!Ownership.ownsDevice(session, userId, device.getId())) {
-                UserAccount user = session.get(UserAccount.class, userId);
+            UserAccount user = session.get(UserAccount.class, userId);
+            if (user == null) return AssignResult.USER_NOT_FOUND;
+            Device device = session.get(Device.class, deviceId);
+            if (device == null) return AssignResult.DEVICE_NOT_FOUND;
+            if (!Ownership.isAssigned(session, userId, deviceId)) {
                 session.persist(new UserDevice(user, device));
             }
-
-            Map<String, Object> out = new LinkedHashMap<>();
-            out.put("id", device.getId());
-            out.put("name", device.getName());
-            out.put("deviceType", device.getDeviceType() == null ? null : device.getDeviceType().name());
-            out.put("online", device.isOnline());
-            out.put("created", created);
-            return out;
+            return AssignResult.OK;
         });
     }
 
-    /** Unlinks a device from this user. true if a relation was removed. */
-    public boolean unlink(int userId, int deviceId) {
+    /** Removes a user's access to a device; true if a relation was removed. */
+    public boolean unassign(int userId, int deviceId) {
         Integer removed = mapper.writeInSession(session -> {
             List<UserDevice> links = session.createQuery(
                             "FROM UserDevice ud WHERE ud.user.id = :uid AND ud.device.id = :did",
@@ -150,17 +100,10 @@ public class DeviceRepository {
         return removed > 0;
     }
 
-    public boolean isLinked(int userId, int deviceId) {
-        return mapper.readInSession(session -> Ownership.ownsDevice(session, userId, deviceId));
-    }
-
-    /**
-     * Set the display name of a device linked to this user. Unlinked ids
-     * answer like missing ones so devices cannot be enumerated.
-     */
-    public RenameResult rename(int userId, int deviceId, String name) {
+    /** Sets the display name; devices the viewer may not see answer like missing ones. */
+    public RenameResult rename(Viewer viewer, int deviceId, String name) {
         return mapper.writeInSession(session -> {
-            if (!Ownership.ownsDevice(session, userId, deviceId)) return RenameResult.NOT_FOUND;
+            if (!Ownership.ownsDevice(session, viewer, deviceId)) return RenameResult.NOT_FOUND;
 
             Device d = session.get(Device.class, deviceId);
             if (d == null) return RenameResult.NOT_FOUND;
@@ -173,13 +116,5 @@ public class DeviceRepository {
             d.setName(name);
             return RenameResult.OK;
         });
-    }
-
-    private static boolean isValidName(String name) {
-        if (name.isEmpty() || name.length() > MAX_NAME_LENGTH) return false;
-        for (int i = 0; i < name.length(); i++) {
-            if (Character.isISOControl(name.charAt(i))) return false;
-        }
-        return true;
     }
 }

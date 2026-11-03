@@ -6,7 +6,7 @@ import WebServer.Http.HttpCall;
 
 import java.io.IOException;
 
-/** GET /api/devices - devices linked to the user. */
+/** GET /api/devices - devices the user may see (admin: all). */
 public class ListDevicesHandler implements Handler {
 
     private final Repositories repos;
@@ -17,6 +17,6 @@ public class ListDevicesHandler implements Handler {
 
     @Override
     public void handle(HttpCall call) throws IOException {
-        call.json(200, repos.devices().listLinked(call.user().userId));
+        call.json(200, repos.devices().listVisible(call.viewer()));
     }
 }

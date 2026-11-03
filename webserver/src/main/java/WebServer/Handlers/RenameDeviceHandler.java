@@ -48,7 +48,7 @@ public class RenameDeviceHandler implements Handler {
             call.error(400, "name must be 1-" + MAX_NAME_LENGTH + " characters without control characters");
             return;
         }
-        switch (repos.devices().rename(call.user().userId, id, name)) {
+        switch (repos.devices().rename(call.viewer(), id, name)) {
             case NOT_FOUND -> call.error(404, "device not found");
             case NAME_TAKEN -> call.error(409, "name already in use");
             default -> {
