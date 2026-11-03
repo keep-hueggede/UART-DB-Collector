@@ -27,20 +27,23 @@ public class WebMain {
             int port = Integer.parseInt(prop.getProperty("SERVER.PORT", "8080"));
             String webRoot = prop.getProperty("SERVER.WEBROOT", "./web");
             boolean secureCookie = Boolean.parseBoolean(prop.getProperty("SERVER.SECURE_COOKIE", "false"));
-            GoogleAuth google = new GoogleAuth(
-                    prop.getProperty("GOOGLE.CLIENT_ID", ""),
-                    prop.getProperty("GOOGLE.CLIENT_SECRET", ""),
-                    prop.getProperty("GOOGLE.REDIRECT_URI", ""));
 
-            webServer = new WebServer(Repositories.of(mapper), new SessionManager(), google,
-                    host, port, webRoot, secureCookie);
+            // Google client and session lifetime come from the Settings table (web app)
+            Repositories repos = Repositories.of(mapper);
+            GoogleAuth google = new GoogleAuth("", "", "");
+            SessionManager sessions = new SessionManager();
+            AppSettings settings = new AppSettings(repos.settings(), google, sessions);
+            settings.importFromConfig(prop);
+            settings.apply();
+
+            webServer = new WebServer(repos, sessions, google, host, port, webRoot, secureCookie);
             webServer.start();
 
             System.out.println("UART-DB-Webserver gestartet.");
             System.out.println("DB:   " + db.describe());
             System.out.println("Web:  http://" + host + ":" + webServer.getPort() + "/");
             if (!google.isConfigured()) {
-                System.out.println("Web:  Google-Login nicht konfiguriert (GOOGLE.CLIENT_ID / GOOGLE.CLIENT_SECRET fehlen)");
+                System.out.println("Web:  Google-Login noch nicht eingerichtet (Einrichtung im Browser)");
             }
         } catch (Exception ex) {
             db.close();
