@@ -4,6 +4,7 @@ import Model.Sensor;
 import Listener.IObserverListener;
 import ORMUtil.DatabaseSetup;
 import ORMUtil.ORMapper;
+import SSHTunnel.TunneledDatabase;
 import UARTCom.UARTCom;
 import com.fasterxml.jackson.databind.JsonNode;
 
@@ -31,7 +32,7 @@ public class Controller implements IObserverListener {
 
     public Controller(Properties prop) {
         try {
-            this.db = new DatabaseSetup(prop);
+            this.db = TunneledDatabase.from(prop);
             ORMapper mapper = this.db.createMapper();
             Spool spool = new Spool(Path.of(prop.getProperty("BUFFER.FILE", "./spool/pending.log")));
 

@@ -4,7 +4,8 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <!-- Shared library: entities, ORMapper, DB setup incl. SSH tunnel -->
+    <!-- Shared library: entities, ORMapper, DB setup. Only what both jars need:
+         H2 and the SSH tunnel live in the collector, so the web server stays lean. -->
     <parent>
         <groupId>keep-hueggede</groupId>
         <artifactId>UART-DB-Collector</artifactId>
@@ -24,14 +25,6 @@
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.github.mwiede</groupId>
-            <artifactId>jsch</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.sshd</groupId>
-            <artifactId>sshd-core</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

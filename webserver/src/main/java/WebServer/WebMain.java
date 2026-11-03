@@ -11,6 +11,11 @@ public class WebMain {
 
     public static void main(String[] args) throws Exception {
         Properties prop = DatabaseSetup.loadConfig(args);
+        if (Boolean.parseBoolean(prop.getProperty("SSH.ENABLED", "false").trim())) {
+            // No SSH library in this jar on purpose: the web server reaches MySQL directly
+            throw new IllegalStateException("SSH.ENABLED=true wird nur vom Collector unterstuetzt;"
+                    + " der Webserver verbindet sich direkt ueber DB.HOST/DB.PORT");
+        }
 
         DatabaseSetup db = new DatabaseSetup(prop);
         WebServer webServer;

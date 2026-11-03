@@ -1,5 +1,6 @@
 package SSHTunnel;
 
+import ORMUtil.DatabaseSetup;
 import com.jcraft.jsch.JSch;
 import com.jcraft.jsch.JSchException;
 import com.jcraft.jsch.Session;
@@ -8,7 +9,7 @@ import com.jcraft.jsch.UserInfo;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-public final class SSHTunnel {
+public final class SSHTunnel implements DatabaseSetup.Tunnel {
 
     private static final String LOOPBACK = "127.0.0.1";
     private static final int KEEPALIVE_INTERVAL_MS = 30_000;
