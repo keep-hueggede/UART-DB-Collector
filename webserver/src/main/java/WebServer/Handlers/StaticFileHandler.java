@@ -69,8 +69,8 @@ public class StaticFileHandler implements Handler {
         }
 
         String name = Paths.get(rawPath).getFileName().toString();
-        String cache = (name.equals("sw.js") || name.equals("index.html") || name.equals("manifest.webmanifest"))
-                ? "no-cache" : "max-age=3600";
+        // shell files must always match each other after an update; only images may be cached
+        String cache = name.matches(".*\\.(png|svg|ico)") ? "max-age=3600" : "no-cache";
         var headers = call.exchange().getResponseHeaders();
         headers.set("Content-Type", mime);
         headers.set("Cache-Control", cache);

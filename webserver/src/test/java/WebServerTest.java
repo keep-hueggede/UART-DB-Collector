@@ -611,6 +611,15 @@ public class WebServerTest {
     }
 
     @Test
+    public void shellFilesAreRevalidatedAfterUpdates() throws Exception {
+        // a cached app.js next to a new index.html breaks the app
+        for (String path : List.of("/", "/index.html", "/app.js", "/style.css", "/sw.js")) {
+            assertEquals("no-cache", get(path, null).headers().firstValue("Cache-Control").orElse(""), path);
+        }
+        assertEquals("max-age=3600", get("/icon-192.png", null).headers().firstValue("Cache-Control").orElse(""));
+    }
+
+    @Test
     public void pathTraversalIsBlocked() throws Exception {
         assertEquals(404, get("/../../pom.xml", null).statusCode());
         assertEquals(404, get("/%2e%2e/pom.xml", null).statusCode());
