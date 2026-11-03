@@ -52,6 +52,29 @@ jobs:
           done
         } >> "$GITHUB_STEP_SUMMARY"
 
+    - name: Coverage summary
+      if: always()
+      run: |
+        {
+          echo "### Test coverage (JaCoCo)"
+          echo "| Module | Lines | Branches |"
+          echo "|---|---|---|"
+          for m in core collector webserver; do
+            csv=$m/target/site/jacoco/jacoco.csv
+            [ -f "$csv" ] || { echo "| $m | – | – |"; continue; }
+            awk -F, -v m=$m 'NR>1 { bm+=$6; bc+=$7; lm+=$8; lc+=$9 }
+              END { printf "| %s | %.0f%% (%d/%d) | %.0f%% |\n", m, 100*lc/(lm+lc), lc, lm+lc, (bm+bc) ? 100*bc/(bm+bc) : 100 }' "$csv"
+          done
+        } >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Upload coverage report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report
+        path: '*/target/site/jacoco/'
+        if-no-files-found: ignore
+
     - name: Upload test reports
       if: always()
       uses: actions/upload-artifact@v4
