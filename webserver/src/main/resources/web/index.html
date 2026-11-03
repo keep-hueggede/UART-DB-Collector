@@ -44,7 +44,7 @@
     <section id="view-dashboard">
       <div class="section-head" id="devices-head">
         <h2 class="section-title">Geräte</h2>
-        <button id="btn-manage-devices" class="text-btn">Verwalten</button>
+        <button id="btn-admin" class="text-btn admin-only">Verwalten</button>
       </div>
       <div id="devices" class="device-list"></div>
       <div class="section-head">
@@ -52,7 +52,11 @@
       </div>
       <div id="sensor-grid" class="sensor-grid"></div>
       <p id="empty-hint" class="empty hidden">Noch keine Messwerte vorhanden.<br>
-        Verknüpfe über "Verwalten" ein Feldgerät oder schalte den Sensor ein.</p>
+        Sobald ein Feldgerät Daten meldet, erscheint es hier.</p>
+      <div id="pending-hint" class="empty hidden">
+        <b>Dein Konto ist angelegt.</b><br>
+        Ein Administrator muss dir noch Feldgeräte zuweisen. Danach siehst du hier deine Messwerte.
+      </div>
     </section>
 
     <section id="view-detail" class="hidden">
@@ -66,7 +70,7 @@
           <h2 id="detail-title">–</h2>
           <p id="detail-sub" class="muted">–</p>
         </div>
-        <button id="btn-calibrate" class="icon-btn detail-calibrate" aria-label="Korrekturwerte" title="Korrekturwerte">
+        <button id="btn-calibrate" class="icon-btn detail-calibrate admin-only" aria-label="Korrekturwerte" title="Korrekturwerte">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>
         </button>
       </div>
@@ -112,34 +116,90 @@
       <p id="login-error" class="hint hint-err hidden">Anmeldung abgebrochen oder fehlgeschlagen. Bitte erneut versuchen.</p>
       <p id="login-config-hint" class="hint hidden">
         Der Google-Login ist auf dem Server noch nicht konfiguriert.<br>
-        <code>GOOGLE.CLIENT_ID</code> und <code>GOOGLE.CLIENT_SECRET</code> in der <code>app.config</code> eintragen.
+        Ein Administrator kann ihn unter „Verwalten → Server“ eintragen.
       </p>
-      <p class="hint">Daten sind nur sichtbar, wenn das Feldgerät mit deinem Konto verknüpft ist.</p>
+      <p class="hint">Daten sind erst sichtbar, wenn ein Administrator dir Feldgeräte zugewiesen hat.</p>
     </div>
   </div>
 
-  <!-- --------------------------------------------- device management -->
+  <!-- ---------------------------------------------------- first-run setup -->
 
-  <dialog id="devices-dialog">
-    <h2>Feldgeräte verwalten</h2>
+  <div id="setup-screen" class="login-screen hidden">
+    <form id="setup-form" class="login-card setup-card" autocomplete="off">
+      <svg class="login-logo" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 14h3v6H4zM10.5 8h3v12h-3zM17 3h3v17h-3z" fill="currentColor" opacity=".85"/>
+      </svg>
+      <h1>Ersteinrichtung</h1>
+      <p class="login-sub">Es gibt noch keinen Administrator. Wer die Einrichtung abschließt, verwaltet diese Installation.</p>
 
-    <h3 class="dialog-subtitle">Verknüpft</h3>
-    <div id="linked-devices" class="dev-list"></div>
-    <p id="linked-empty" class="hint hidden">Noch keine Geräte verknüpft.</p>
+      <div class="setup-step">
+        <h2>1. Einrichtungscode</h2>
+        <p>Der Server hat einen einmaligen Code in diese Datei geschrieben:</p>
+        <code id="setup-code-file" class="setup-path">–</code>
+        <p class="hint">Nur wer Zugriff auf das Server-Verzeichnis hat, kann ihn lesen
+          (z.B. <code>cat</code> per SSH). Nach der Einrichtung wird die Datei gelöscht.</p>
+        <label for="setup-code">Code</label>
+        <input id="setup-code" type="text" required placeholder="XXXX-XXXX-XXXX-XXXX"
+               autocapitalize="characters" spellcheck="false" maxlength="40">
+      </div>
 
-    <h3 class="dialog-subtitle">In der Datenbank vorhanden</h3>
-    <div id="available-devices" class="dev-list"></div>
-    <p id="available-empty" class="hint hidden">Keine weiteren Geräte vorhanden.</p>
+      <div class="setup-step">
+        <h2>2. Google-Login</h2>
+        <p>In der Google Cloud Console einen OAuth-Client vom Typ „Webanwendung“ anlegen und als
+          autorisierte Weiterleitungs-URI eintragen:</p>
+        <code id="setup-redirect" class="setup-path">–</code>
+        <label for="setup-client-id">Client-ID</label>
+        <input id="setup-client-id" type="text" spellcheck="false" placeholder="….apps.googleusercontent.com">
+        <label for="setup-client-secret">Clientschlüssel</label>
+        <input id="setup-client-secret" type="password" spellcheck="false" autocomplete="new-password">
+        <p id="setup-secret-hint" class="hint hidden">Ein Schlüssel ist bereits gespeichert – leer lassen, um ihn zu behalten.</p>
+      </div>
 
-    <h3 class="dialog-subtitle">Nach Namen hinzufügen</h3>
-    <div class="row">
-      <input id="new-device-name" type="text" placeholder="z.B. wetter1" maxlength="100" autocomplete="off">
-      <button id="btn-add-device" class="primary-btn">Hinzufügen</button>
+      <div class="setup-step">
+        <h2>3. Administrator werden</h2>
+        <p>Das Google-Konto, mit dem du dich gleich anmeldest, wird Administrator. Weitere Benutzer
+          kannst du danach unter „Verwalten“ freigeben oder zu Administratoren machen.</p>
+      </div>
+
+      <button type="submit" class="primary-btn setup-submit">Speichern und mit Google anmelden</button>
+      <p id="setup-error" class="hint hint-err hidden"></p>
+    </form>
+  </div>
+
+  <!-- --------------------------------------------------------- admin -->
+
+  <dialog id="admin-dialog" class="wide-dialog">
+    <h2>Verwalten</h2>
+    <div class="range-tabs admin-tabs" id="admin-tabs">
+      <button data-tab="users" class="active">Benutzer</button>
+      <button data-tab="server">Server</button>
     </div>
-    <p class="hint">Ein neuer Name legt das Gerät an, sobald die Edge-Device Daten dafür meldet.</p>
+
+    <div id="admin-users">
+      <p class="hint">Benutzer sehen nur die Feldgeräte, die du ihnen zuweist.
+        Administratoren sehen alles und können Geräte umbenennen, Korrekturwerte setzen und Einstellungen ändern.</p>
+      <div id="admin-user-list" class="dev-list"></div>
+    </div>
+
+    <form id="admin-server" class="hidden" autocomplete="off">
+      <label for="adm-client-id">Google Client-ID</label>
+      <input id="adm-client-id" type="text" spellcheck="false">
+      <label for="adm-client-secret">Google Clientschlüssel</label>
+      <input id="adm-client-secret" type="password" spellcheck="false" autocomplete="new-password"
+             placeholder="leer = unverändert">
+      <label for="adm-redirect">Weiterleitungs-URI</label>
+      <input id="adm-redirect" type="text" spellcheck="false" placeholder="leer = aus der Anfrage ableiten">
+      <p class="hint">Muss exakt so in der Google Cloud Console eingetragen sein, z.B.
+        <code>https://example.org/auth/callback</code>.</p>
+      <label for="adm-ttl">Anmeldung gültig (Tage)</label>
+      <input id="adm-ttl" type="number" min="1" max="365" step="1" required>
+      <div class="dialog-actions">
+        <button type="submit">Speichern</button>
+      </div>
+    </form>
 
     <div class="dialog-actions">
-      <button value="close" id="btn-close-devices">Fertig</button>
+      <button id="btn-close-admin" class="secondary">Schließen</button>
     </div>
   </dialog>
 

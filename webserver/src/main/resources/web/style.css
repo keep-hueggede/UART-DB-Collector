@@ -521,3 +521,79 @@ main.faded { display: none; }
 
 .device-edit { flex: none; width: 36px; height: 36px; margin-right: -8px; }
 .device-edit svg { width: 18px; height: 18px; }
+
+/* ------------------------------------------------------------- roles */
+
+body:not(.is-admin) .admin-only { display: none !important; }
+
+/* ------------------------------------------------------ first-run setup */
+
+#setup-screen { overflow-y: auto; place-items: start center; }
+.setup-card { width: min(100%, 440px); margin: 24px auto; }
+.setup-step {
+  width: 100%;
+  text-align: left;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+.setup-step h2 { margin: 0 0 6px; font-size: 15px; }
+.setup-step p { margin: 6px 0; font-size: 13px; line-height: 1.5; color: var(--text-muted); }
+.setup-step label { display: block; font-size: 13px; color: var(--text-muted); margin: 12px 0 6px; }
+.setup-step input {
+  width: 100%;
+  padding: 11px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+}
+.setup-step .hint { font-size: 12px; }
+.setup-path {
+  display: block;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.setup-submit { width: 100%; }
+.setup-submit:disabled { opacity: .6; cursor: progress; }
+
+/* --------------------------------------------------------------- admin */
+
+dialog.wide-dialog { width: min(94vw, 520px); }
+.admin-tabs { margin: 0 0 12px; }
+.user-row { flex-direction: column; align-items: stretch; }
+.user-head { display: flex; align-items: center; gap: 10px; }
+.user-head .dev-info { flex-direction: column; align-items: flex-start; gap: 0; flex: 1; }
+.user-head .dev-name { font-weight: 600; }
+.role-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .4px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  margin-left: 6px;
+}
+.role-badge.pending { background: rgba(210, 153, 34, .15); color: var(--warn); }
+.device-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.device-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+.device-chip input { width: auto; margin: 0; accent-color: var(--accent); }
+.device-chip:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }

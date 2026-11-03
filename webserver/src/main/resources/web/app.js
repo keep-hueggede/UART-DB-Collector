@@ -272,7 +272,12 @@ const state = {
   refreshTimer: null,
   currentSensorId: null,
   loggedIn: false,
+  me: null,
 };
+
+function isAdmin() {
+  return state.me?.role === "ADMIN";
+}
 
 const $ = id => document.getElementById(id);
 
@@ -310,6 +315,8 @@ function showApp(me) {
   state.loggedIn = true;
   $("login-screen").classList.add("hidden");
   document.querySelector("main").classList.remove("faded");
+  state.me = me;
+  document.body.classList.toggle("is-admin", isAdmin());
   if (me) {
     $("user-chip").classList.remove("hidden");
     $("btn-logout").classList.remove("hidden");
@@ -348,7 +355,10 @@ async function loadDashboard() {
   state.sensors = sensors;
   renderDevices(devices);
   renderSensors(sensors, latest);
-  $("empty-hint").classList.toggle("hidden", sensors.length > 0);
+  const pending = state.me && !state.me.approved && devices.length === 0;
+  $("pending-hint").classList.toggle("hidden", !pending);
+  $("empty-hint").classList.toggle("hidden", pending || sensors.length > 0);
+  $("devices-head").classList.toggle("hidden", pending);
   $("sensors-title").classList.toggle("hidden", sensors.length === 0);
   const latestTs = latest.map(m => m.timestamp).filter(Boolean).sort((a, b) => b - a)[0];
   const line = $("status-line");
@@ -386,7 +396,7 @@ function renderDevices(devices) {
         <p>${escapeHtml(d.deviceType || "SENSOR")} · ${d.sensorCount || 0} Sensor${d.sensorCount === 1 ? "" : "en"}</p>
       </div>
       <div class="device-meta">${d.lastSeen ? fmtAge(d.lastSeen) : ""}</div>
-      <button class="icon-btn device-edit" aria-label="Umbenennen">${PENCIL_ICON}</button>`;
+      <button class="icon-btn device-edit admin-only" aria-label="Umbenennen">${PENCIL_ICON}</button>`;
     card.querySelector(".device-edit").addEventListener("click", e => {
       e.stopPropagation();
       openRename(d);
@@ -471,96 +481,184 @@ $("range-tabs").addEventListener("click", e => {
   loadDetail().catch(err => { if (!err.isAuth) toast(err.message, true); });
 });
 
-/* ------------------------------------------------- device management */
+/* ---------------------------------------------------------------- admin */
 
-const devicesDialog = $("devices-dialog");
+const adminDlg = $("admin-dialog");
+const reportError = err => { if (!err.isAuth) toast(err.message, true); };
 
-$("btn-manage-devices").addEventListener("click", () => openManageDevices().catch(err => toast(err.message, true)));
-
-async function openManageDevices() {
-  const [linked, available] = await Promise.all([
-    api("/api/devices"),
-    api("/api/devices/available"),
-  ]);
-  renderDeviceLists(linked, available);
-  devicesDialog.showModal();
-}
-
-function renderDeviceLists(linked, available) {
-  const linkedRoot = $("linked-devices");
-  linkedRoot.innerHTML = "";
-  $("linked-empty").classList.toggle("hidden", linked.length > 0);
-  for (const d of linked) {
-    const row = el("div", "dev-row");
-    row.innerHTML = `
-      <div class="dev-info">
-        <span class="device-dot ${d.online ? "on" : ""}"></span>
-        <span class="dev-name">${escapeHtml(d.name)}</span>
-        <span class="dev-type">${escapeHtml(d.deviceType || "")}</span>
-      </div>
-      <button class="small-btn danger" data-unlink="${d.id}">Entfernen</button>`;
-    linkedRoot.appendChild(row);
-  }
-
-  const availRoot = $("available-devices");
-  availRoot.innerHTML = "";
-  $("available-empty").classList.toggle("hidden", available.length > 0);
-  for (const d of available) {
-    const row = el("div", "dev-row");
-    row.innerHTML = `
-      <div class="dev-info">
-        <span class="device-dot ${d.online ? "on" : ""}"></span>
-        <span class="dev-name">${escapeHtml(d.name)}</span>
-        <span class="dev-type">${escapeHtml(d.deviceType || "")}</span>
-      </div>
-      <button class="small-btn" data-link="${d.id}">Hinzufügen</button>`;
-    availRoot.appendChild(row);
-  }
-}
-
-devicesDialog.addEventListener("click", async e => {
-  const linkId = e.target.dataset?.link;
-  const unlinkId = e.target.dataset?.unlink;
-  try {
-    if (linkId) {
-      await api("/api/devices", { method: "POST", body: JSON.stringify({ deviceId: Number(linkId) }) });
-      await refreshDeviceLists();
-      toast("Gerät verknüpft");
-    } else if (unlinkId) {
-      await api(`/api/devices/${unlinkId}`, { method: "DELETE" });
-      await refreshDeviceLists();
-      toast("Verknüpfung entfernt");
-    }
-  } catch (err) {
-    if (!err.isAuth) toast(err.message, true);
-  }
+$("btn-admin").addEventListener("click", () => {
+  showAdminTab("users");
+  loadAdminUsers().then(() => adminDlg.showModal()).catch(reportError);
 });
 
-async function refreshDeviceLists() {
-  const [linked, available] = await Promise.all([
-    api("/api/devices"),
-    api("/api/devices/available"),
-  ]);
-  renderDeviceLists(linked, available);
-}
-
-$("btn-add-device").addEventListener("click", async () => {
-  const input = $("new-device-name");
-  const name = input.value.trim();
-  if (!name) { toast("Name eingeben", true); return; }
-  try {
-    const dev = await api("/api/devices", { method: "POST", body: JSON.stringify({ name }) });
-    input.value = "";
-    await refreshDeviceLists();
-    toast(dev.created ? `Gerät "${dev.name}" angelegt und verknüpft` : `Gerät "${dev.name}" verknüpft`);
-  } catch (err) {
-    if (!err.isAuth) toast(err.message, true);
-  }
-});
-
-$("btn-close-devices").addEventListener("click", () => {
-  devicesDialog.close();
+$("btn-close-admin").addEventListener("click", () => {
+  adminDlg.close();
   refresh().catch(() => {});
+});
+
+$("admin-tabs").addEventListener("click", e => {
+  const btn = e.target.closest("button[data-tab]");
+  if (!btn) return;
+  showAdminTab(btn.dataset.tab);
+  (btn.dataset.tab === "users" ? loadAdminUsers() : loadAdminSettings()).catch(reportError);
+});
+
+function showAdminTab(tab) {
+  for (const b of $("admin-tabs").children) b.classList.toggle("active", b.dataset.tab === tab);
+  $("admin-users").classList.toggle("hidden", tab !== "users");
+  $("admin-server").classList.toggle("hidden", tab !== "server");
+}
+
+async function loadAdminUsers() {
+  // admins see every device, so /api/devices is the full list here
+  const [users, devices] = await Promise.all([api("/api/admin/users"), api("/api/devices")]);
+  const root = $("admin-user-list");
+  root.innerHTML = "";
+  for (const u of users) {
+    const admin = u.role === "ADMIN";
+    const self = u.id === state.me?.userId;
+    const row = el("div", "dev-row user-row");
+    const badge = admin ? '<span class="role-badge">ADMIN</span>'
+      : u.deviceIds.length === 0 ? '<span class="role-badge pending">WARTET</span>' : "";
+    row.innerHTML = `
+      <div class="user-head">
+        <div class="dev-info">
+          <span class="dev-name">${escapeHtml(u.name || u.email)}${self ? " (du)" : ""}${badge}</span>
+          <span class="dev-type">${escapeHtml(u.email)} · zuletzt ${u.lastLogin ? fmtAge(u.lastLogin) : "–"}</span>
+        </div>
+        <button class="small-btn ${admin ? "danger" : ""}" data-role="${admin ? "USER" : "ADMIN"}">
+          ${admin ? "Admin entziehen" : "Zum Admin machen"}</button>
+      </div>`;
+    row.querySelector("[data-role]").addEventListener("click", e => setRole(u, e.currentTarget.dataset.role, self));
+
+    if (admin) {
+      row.appendChild(el("p", "hint", "Sieht alle Feldgeräte."));
+    } else {
+      const chips = el("div", "device-chips");
+      for (const d of devices) {
+        const chip = el("label", "device-chip");
+        chip.innerHTML = `<input type="checkbox" ${u.deviceIds.includes(d.id) ? "checked" : ""}>${escapeHtml(d.name)}`;
+        chip.querySelector("input").addEventListener("change", e => assignDevice(u, d, e.target));
+        chips.appendChild(chip);
+      }
+      if (devices.length === 0) chips.appendChild(el("span", "hint", "Noch keine Feldgeräte vorhanden."));
+      row.appendChild(chips);
+    }
+    root.appendChild(row);
+  }
+}
+
+async function setRole(user, role, self) {
+  if (self && role === "USER" && !confirm("Dir selbst die Admin-Rechte entziehen?")) return;
+  try {
+    await api(`/api/admin/users/${user.id}/role`, { method: "PUT", body: JSON.stringify({ role }) });
+    toast(role === "ADMIN" ? `${user.name || user.email} ist jetzt Admin` : "Admin-Rechte entzogen");
+    if (self) { location.reload(); return; }
+    await loadAdminUsers();
+  } catch (err) {
+    reportError(err);
+  }
+}
+
+async function assignDevice(user, device, checkbox) {
+  checkbox.disabled = true;
+  try {
+    await api(`/api/admin/users/${user.id}/devices/${device.id}`, {
+      method: checkbox.checked ? "PUT" : "DELETE",
+      body: checkbox.checked ? "{}" : undefined,
+    });
+    if (checkbox.checked) user.deviceIds.push(device.id);
+    else user.deviceIds = user.deviceIds.filter(id => id !== device.id);
+  } catch (err) {
+    checkbox.checked = !checkbox.checked;
+    reportError(err);
+  } finally {
+    checkbox.disabled = false;
+  }
+}
+
+async function loadAdminSettings() {
+  const s = await api("/api/admin/settings");
+  $("adm-client-id").value = s.googleClientId || "";
+  $("adm-client-secret").value = "";
+  $("adm-client-secret").placeholder = s.googleClientSecretSet ? "gespeichert – leer = unverändert" : "noch nicht gesetzt";
+  $("adm-redirect").value = s.googleRedirectUri || "";
+  $("adm-ttl").value = s.sessionTtlDays;
+}
+
+$("admin-server").addEventListener("submit", async e => {
+  e.preventDefault();
+  const body = {
+    googleClientId: $("adm-client-id").value.trim(),
+    googleRedirectUri: $("adm-redirect").value.trim(),
+    sessionTtlDays: parseInt($("adm-ttl").value, 10),
+  };
+  const secret = $("adm-client-secret").value.trim();
+  if (secret) body.googleClientSecret = secret;
+  try {
+    await api("/api/admin/settings", { method: "PUT", body: JSON.stringify(body) });
+    toast("Einstellungen gespeichert");
+    await loadAdminSettings();
+  } catch (err) {
+    reportError(err);
+  }
+});
+
+/* ------------------------------------------------------ first-run setup */
+
+async function fetchSetupStatus() {
+  try {
+    const res = await fetch(apiUrl("/api/setup"), { headers: { Accept: "application/json" } });
+    return res.ok ? await res.json() : null;
+  } catch (_) {
+    return null; // offline: fall through to the normal start-up
+  }
+}
+
+function showSetup(status) {
+  $("setup-code-file").textContent = status.codeFile || "–";
+  $("setup-redirect").textContent = status.redirectUri || "–";
+  $("setup-client-id").value = status.googleClientId || "";
+  $("setup-secret-hint").classList.toggle("hidden", !status.googleClientSecretSet);
+  $("setup-client-secret").required = !status.googleClientSecretSet;
+  $("setup-client-id").required = true;
+  $("setup-screen").classList.remove("hidden");
+  document.querySelector("main").classList.add("faded");
+}
+
+$("setup-form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const error = $("setup-error");
+  const submit = e.target.querySelector("button[type=submit]");
+  error.classList.add("hidden");
+  submit.disabled = true;
+  try {
+    // credentials so the claim cookie is stored for the /auth callback
+    const res = await fetch(apiUrl("/api/setup"), {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify({
+        code: $("setup-code").value.trim(),
+        googleClientId: $("setup-client-id").value.trim(),
+        googleClientSecret: $("setup-client-secret").value.trim(),
+        googleRedirectUri: /^https?:\/\//.test($("setup-redirect").textContent) ? $("setup-redirect").textContent.trim() : "",
+      }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const messages = {
+        403: "Der Code stimmt nicht. Nach 10 Fehlversuchen wird ein neuer Code in die Datei geschrieben.",
+        409: "Die Einrichtung ist bereits abgeschlossen.",
+      };
+      throw new Error(messages[res.status] || body.error || "HTTP " + res.status);
+    }
+    location.href = apiUrl(body.next || "/auth/login");
+  } catch (err) {
+    error.textContent = err.message;
+    error.classList.remove("hidden");
+    submit.disabled = false;
+  }
 });
 
 /* --------------------------------------------------------------- rename */
@@ -702,10 +800,16 @@ if ("serviceWorker" in navigator) {
 
 (async function boot() {
   const fragment = consumeAuthFragment();
+  const setup = await fetchSetupStatus();
+  if (setup?.setupRequired) {
+    showSetup(setup);
+    if (fragment === "error") toast("Google-Anmeldung fehlgeschlagen", true);
+    return;
+  }
   try {
     const me = await api("/api/auth/me");
     showApp(me);
-    if (fragment === "ok") toast("Angemeldet");
+    if (fragment === "ok") toast(isAdmin() ? "Angemeldet als Administrator" : "Angemeldet");
   } catch (err) {
     if (err.isAuth) {
       if (fragment === "error") $("login-error").classList.remove("hidden");
