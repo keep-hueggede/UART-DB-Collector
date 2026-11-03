@@ -2,7 +2,7 @@
 # Kopieren nach ./app.config und anpassen. Beide Jars lesen dieselbe Datei
 # und ignorieren fremde Schluessel:
 #   uart-db-collector.jar (Pi):    UART.*, BUFFER.*, DB.*, SSH.*
-#   uart-db-webserver.jar (Server): SERVER.*, GOOGLE.*, DB.* (SSH.* optional)
+#   uart-db-webserver.jar (Server): SERVER.*, GOOGLE.*, DB.* (nur MySQL, kein H2/SSH)
 
 # === UART (ESP-C6 ThreadReceiver -> Pi) - nur Collector ===
 UART.PORTNAME=/dev/serial0
@@ -50,7 +50,7 @@ GOOGLE.CLIENT_SECRET=
 # Host-Header des Requests abgeleitet.
 GOOGLE.REDIRECT_URI=
 
-# === SSH-Tunnel zur MySQL-DB auf einem Server ===
+# === SSH-Tunnel zur MySQL-DB auf dem Webserver - nur Collector (Pi) ===
 # SSH.ENABLED=true leitet 127.0.0.1:<SSH.LOCAL_PORT> ueber den SSH-Server an
 # SSH.REMOTE_HOST:SSH.REMOTE_PORT weiter; DB.HOST/DB.PORT werden dann ignoriert.
 # Voraussetzung: DB.DRIVER=mysql. Details siehe README.

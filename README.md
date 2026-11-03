@@ -349,13 +349,13 @@ deshalb immer **beide Jars aus demselben Stand** ausrollen.
 pom.xml                      Parent ("Solution"): Module + Versionen
 core/                        gemeinsame Bibliothek
   src/main/java/Model/         Entities (Device, Sensor, Measurement, UserAccount, ...)
-  src/main/java/ORMUtil/       Hibernate/ORMapper, DatabaseSetup (Config, DB, Tunnel)
-  src/main/java/SSHTunnel/     SSH-Tunnel (lokales Port-Forwarding) + Konfiguration
+  src/main/java/ORMUtil/       Hibernate/ORMapper, DatabaseSetup (Config, DB)
   src/main/java/DBConnector/   Datenbank-Basisklassen (JDBC)
 collector/                   -> uart-db-collector.jar (Pi)
   src/main/java/Controller/    Start, UART-Parsing, Ingestor (Speichern), Spool (Puffer)
   src/main/java/UARTCom/       Serielle Schnittstelle + Listener
-webserver/                   -> uart-db-webserver.jar (Server)
+  src/main/java/SSHTunnel/     SSH-Tunnel zur MySQL-DB auf dem Webserver
+webserver/                   -> uart-db-webserver.jar (Server, nur MySQL: ohne H2 und SSH)
   src/main/java/WebServer/     HTTP-Server, Auth (Google/Sessions), REST-API, WebMain
   src/main/resources/web/      PWA (HTML/CSS/JS, Service Worker, Icons)
 */src/test/java/             JUnit-Tests (H2, HTTP-Server, SSH-Server im Testprozess)
