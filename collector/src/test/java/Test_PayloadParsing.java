@@ -55,6 +55,15 @@ public class Test_PayloadParsing {
     }
 
     @Test
+    public void firmwareVersionIsReadButNoMeasurement() throws Exception {
+        String line = "{\"src\":\"1051dbfffe60b875\",\"temp\":23.4,\"fw\":\"1.2.0\"}";
+        Controller.ParsedData p = Controller.parseLine(om.readTree(line));
+        assertEquals("1.2.0", p.fw);
+        assertEquals(1, p.values.size());
+        assertNull(Controller.parseLine(om.readTree("{\"src\":\"a\",\"temp\":1}")).fw);
+    }
+
+    @Test
     public void missingFieldsAreSkipped() throws Exception {
         String line = "{\"src\":\"wald2\",\"rain\":1.35}";
         Controller.ParsedData p = Controller.parseLine(om.readTree(line));

@@ -44,6 +44,15 @@ SERVER.SECURE_COOKIE=false
 # vorhandene GOOGLE.CLIENT_ID / GOOGLE.CLIENT_SECRET / GOOGLE.REDIRECT_URI
 # werden beim ersten Start einmalig in die Datenbank uebernommen.
 
+# === Sensor-Firmware-Updates - nur Collector (Pi) ===
+# Neue GitHub-Releases der Sensor-Firmware werden geladen, per SHA-256
+# geprueft und an den Empfaenger (ESP32-C6) uebertragen; die Sensoren
+# aktualisieren sich dann selbst ueber Thread.
+FIRMWARE.ENABLED=true
+FIRMWARE.REPO=keep-hueggede/ESP12-BME
+FIRMWARE.CHECK_HOURS=6
+FIRMWARE.DIR=./firmware
+
 # === SSH-Tunnel zur MySQL-DB auf dem Webserver - nur Collector (Pi) ===
 # SSH.ENABLED=true leitet 127.0.0.1:<SSH.LOCAL_PORT> ueber den SSH-Server an
 # SSH.REMOTE_HOST:SSH.REMOTE_PORT weiter; DB.HOST/DB.PORT werden dann ignoriert.

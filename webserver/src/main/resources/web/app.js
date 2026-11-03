@@ -394,7 +394,7 @@ function renderDevices(devices) {
       <span class="device-dot ${d.online ? "on" : ""}"></span>
       <div>
         <h3>${escapeHtml(d.name || "–")}</h3>
-        <p>${escapeHtml(d.deviceType || "SENSOR")} · ${d.sensorCount || 0} Sensor${d.sensorCount === 1 ? "" : "en"}</p>
+        <p>${escapeHtml(d.deviceType || "SENSOR")} · ${d.sensorCount || 0} Sensor${d.sensorCount === 1 ? "" : "en"}${d.firmware ? " · Firmware " + escapeHtml(d.firmware) : ""}</p>
       </div>
       <div class="device-meta">${d.lastSeen ? fmtAge(d.lastSeen) : ""}</div>
       <button class="icon-btn device-edit admin-only" aria-label="Umbenennen">${PENCIL_ICON}</button>`;

@@ -59,6 +59,7 @@ public class DeviceRepository {
                 m.put("deviceType", d.getDeviceType() == null ? null : d.getDeviceType().name());
                 m.put("location", d.getLocation());
                 m.put("online", d.isOnline());
+                m.put("firmware", d.getFirmware());
                 m.put("lastSeen", Ownership.toMillis(d.getLastSeen()));
                 m.put("sensorCount", ((Number) row[1]).intValue());
                 m.put("lastMeasurement", Ownership.toMillis((Date) row[2]));

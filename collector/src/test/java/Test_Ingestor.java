@@ -1,5 +1,6 @@
 import Controller.Ingestor;
 import Controller.Spool;
+import Model.Device;
 import Model.Measurement;
 import ORMUtil.DatabaseSetup;
 import ORMUtil.ORMapper;
@@ -61,6 +62,16 @@ public class Test_Ingestor {
         assertEquals(2, ms.size());
         assertEquals(T_A, ms.get(0).getTimestamp().getTime());
         assertTrue(spool.isEmpty());
+    }
+
+    @Test
+    public void remembersReportedFirmware() {
+        ingestor.ingest("{\"src\":\"1051dbfffe60b875\",\"temp\":20.5,\"fw\":\"1.2.0\"}", T_A);
+        assertEquals("1.2.0", mapper.findByHardwareId(Device.class, "1051dbfffe60b875").getFirmware());
+        // an older, replayed line must not overwrite the newer version
+        ingestor.ingest("{\"src\":\"1051dbfffe60b875\",\"temp\":20.5,\"fw\":\"1.1.0\"}", T_A - 1000);
+        mapper.clear();
+        assertEquals("1.2.0", mapper.findByHardwareId(Device.class, "1051dbfffe60b875").getFirmware());
     }
 
     @Test

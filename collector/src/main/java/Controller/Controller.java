@@ -1,5 +1,6 @@
 package Controller;
 
+import Firmware.FirmwareUpdater;
 import Model.Sensor;
 import Listener.IObserverListener;
 import ORMUtil.DatabaseSetup;
@@ -29,6 +30,13 @@ public class Controller implements IObserverListener {
         return t;
     });
     private int reconnectFailures = 0;
+    // Firmware uploads take minutes and must not block the database thread
+    private final ScheduledExecutorService firmwareWorker = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "firmware");
+        t.setDaemon(true);
+        return t;
+    });
+    private FirmwareUpdater firmware;
 
     public Controller(Properties prop) {
         try {
@@ -53,9 +61,17 @@ public class Controller implements IObserverListener {
 
             this.worker.scheduleWithFixedDelay(this::maintain, 5, RETRY_S, TimeUnit.SECONDS);
 
+            if (FirmwareUpdater.enabled(prop)) {
+                this.firmware = new FirmwareUpdater(prop, line -> this.com.Send(line));
+                long hours = FirmwareUpdater.checkHours(prop);
+                this.firmwareWorker.scheduleWithFixedDelay(this::checkFirmware, 2, hours * 60, TimeUnit.MINUTES);
+                System.out.println("Firmware: Sensor-Updates aktiv, Pruefung alle " + hours + " h");
+            }
+
         } catch (Exception ex) {
             // Fail fast instead of running half-initialised (NPE later on)
             this.worker.shutdownNow();
+            this.firmwareWorker.shutdownNow();
             if (this.db != null) this.db.close();
             throw new IllegalStateException("UART-DB-Collector startup failed: " + ex.getMessage(), ex);
         }
@@ -67,6 +83,7 @@ public class Controller implements IObserverListener {
     }
 
     public void shutdown() {
+        this.firmwareWorker.shutdownNow();
         this.com.close();
         this.worker.shutdown();
         try {
@@ -147,20 +164,44 @@ public class Controller implements IObserverListener {
                 values.put(types[i], val.asDouble());
             }
         }
-        return new ParsedData(src, values);
+        String fw = root.hasNonNull("fw") ? root.get("fw").asText() : null;
+        return new ParsedData(src, values, fw);
     }
 
     public static class ParsedData {
         public final String src;
         public final java.util.Map<Sensor.SensorType, Double> values;
-        public ParsedData(String src, java.util.Map<Sensor.SensorType, Double> values) {
+        public final String fw;   // firmware version, null for nodes that do not report it
+        public ParsedData(String src, java.util.Map<Sensor.SensorType, Double> values, String fw) {
             this.src = src;
             this.values = values;
+            this.fw = fw;
+        }
+    }
+
+    private void checkFirmware() {
+        try {
+            FirmwareUpdater.Result result = this.firmware.check();
+            if (result == FirmwareUpdater.Result.RECEIVER_UNAVAILABLE) {
+                System.err.println("Firmware: Empfaenger antwortet nicht (Firmware ohne Update-Funktion?)");
+            }
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        } catch (Exception ex) {
+            System.err.println("Firmware: Update fehlgeschlagen: " + ex.getMessage());
         }
     }
 
     @Override
     public void onSignaled(String answer) {
+        if (answer.startsWith("{\"fw\"")) {
+            if (this.firmware != null) this.firmware.onReply(answer);
+            return;
+        }
+        // a rebooted receiver may have lost its image (e.g. reflashed): check soon
+        if (this.firmware != null && answer.contains("ESP-ThreadReceiver boot")) {
+            this.firmwareWorker.schedule(this::checkFirmware, 30, TimeUnit.SECONDS);
+        }
         long receivedAt = System.currentTimeMillis();
         this.worker.execute(() -> this.ingestor.ingest(answer, receivedAt));
     }

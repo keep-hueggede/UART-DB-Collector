@@ -37,6 +37,10 @@ public class Device {
     @Column(name = "LastSeen")
     private Date lastSeen;
 
+    // Firmware version the device reported last (sensor updates)
+    @Column(name = "Firmware", length = 32)
+    private String firmware;
+
     @OneToMany(mappedBy = "device", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Sensor> sensors = new ArrayList<>();
 
@@ -72,6 +76,8 @@ public class Device {
     public void setOnline(boolean online) { this.online = online; }
     public Date getLastSeen() { return lastSeen; }
     public void setLastSeen(Date lastSeen) { this.lastSeen = lastSeen; }
+    public String getFirmware() { return firmware; }
+    public void setFirmware(String firmware) { this.firmware = firmware; }
     public List<Sensor> getSensors() { return sensors; }
     public List<Actuator> getActuators() { return actuators; }
     public Date getCreatedAt() { return createdAt; }

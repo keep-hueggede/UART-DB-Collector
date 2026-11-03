@@ -145,7 +145,7 @@ public final class Ingestor {
     private void store(Controller.ParsedData parsed, long receivedAt) {
         Date at = new Date(receivedAt);
         try {
-            Device device = getOrCreateDevice(parsed.src, at);
+            Device device = getOrCreateDevice(parsed.src, at, parsed.fw);
             for (Map.Entry<Sensor.SensorType, Double> e : parsed.values.entrySet()) {
                 Sensor sensor = getOrCreateSensor(device, e.getKey());
                 mapper.persist(new Measurement(sensor, e.getValue(), at));
@@ -160,7 +160,7 @@ public final class Ingestor {
         }
     }
 
-    private Device getOrCreateDevice(String hardwareId, Date at) {
+    private Device getOrCreateDevice(String hardwareId, Date at, String firmware) {
         Device device = mapper.findByHardwareId(Device.class, hardwareId);
         if (device == null) {
             // Name defaults to the hardware id until the user renames it in the web app
@@ -170,7 +170,10 @@ public final class Ingestor {
             System.out.println("  Neues Device: " + hardwareId);
         }
         device.setOnline(true);
-        if (device.getLastSeen() == null || at.after(device.getLastSeen())) device.setLastSeen(at);
+        if (device.getLastSeen() == null || at.after(device.getLastSeen())) {
+            device.setLastSeen(at);
+            if (firmware != null && firmware.length() <= 32) device.setFirmware(firmware);
+        }
         mapper.merge(device);
         return device;
     }

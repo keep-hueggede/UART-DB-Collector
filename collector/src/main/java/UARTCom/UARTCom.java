@@ -29,6 +29,8 @@ public class UARTCom extends Observer implements IListenerInterface {
         this.com.setNumDataBits(8);
         this.com.setNumStopBits(SerialPort.ONE_STOP_BIT);
         this.com.setParity(SerialPort.NO_PARITY);
+        // writes block until sent (firmware upload); reading is event driven
+        this.com.setComPortTimeouts(SerialPort.TIMEOUT_WRITE_BLOCKING, 0, 5000);
         if (!this.com.openPort()) {
             throw new IllegalStateException("Cannot open serial port " + this.portDescriptor
                     + " (missing, busy or no permission; is the serial console disabled?)");
@@ -43,10 +45,15 @@ public class UARTCom extends Observer implements IListenerInterface {
     }
 
     @Override
-    public void Send(String input) {
+    public synchronized void Send(String input) {
         if (this.com == null || !this.com.isOpen()) return;
-        byte[] buffer = input.getBytes();
-        this.com.writeBytes(buffer, buffer.length);
+        byte[] buffer = input.getBytes(StandardCharsets.UTF_8);
+        int sent = 0;
+        while (sent < buffer.length) {
+            int n = this.com.writeBytes(buffer, buffer.length - sent, sent);
+            if (n <= 0) throw new IllegalStateException("UART write failed");
+            sent += n;
+        }
     }
 
     @Override

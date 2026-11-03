@@ -365,6 +365,34 @@ laeuft der Collector weiter: UART-Zeilen landen in `./spool/pending.log` und
 werden alle 30 s nachgetragen, sobald die Verbindung wieder steht. Logs:
 `tail -f ~/app/collector.log`.
 
+### Firmware-Updates der Sensoren
+
+Die Sensoren (ESP32-H2, Repo `ESP12-BME`) aktualisieren sich selbst:
+
+```
+GitHub-Release (ESP12-BME) --HTTPS--> Pi --UART--> ESP32-C6 (Flash-Puffer) --Thread/CoAP--> Sensoren
+```
+
+1. Ein Versions-Tag im Sensor-Repo (`git tag v1.2.0 && git push origin v1.2.0`)
+   baut die Firmware und veroeffentlicht `esp-bme.bin` mit `SHA256SUMS`.
+2. Der Collector prueft alle `FIRMWARE.CHECK_HOURS` Stunden (und nach jedem
+   Neustart des Empfaengers) das neueste Release, prueft die SHA-256, legt das
+   Abbild in `FIRMWARE.DIR` ab und uebertraegt es an den C6 (ca. 3 min bei
+   115200 Baud). Danach steht im Log
+   `Firmware: 1.2.0 auf dem Empfaenger gespeichert`.
+3. Meldet ein Sensor eine andere Version, bietet der C6 das Update in der
+   Antwort auf die Messung an (hoechstens 3-mal je Sensor und Version). Der
+   Sensor laedt es ueber Thread (einige Minuten wach), prueft die SHA-256 und
+   startet neu.
+4. Die neue Firmware gilt erst nach der ersten quittierten Messung als gut;
+   sonst schaltet der Bootloader beim naechsten Start auf die alte zurueck.
+
+Die gemeldete Version steht in der Web-App auf der Geraetekarte
+("Firmware 1.2.0"). Lokal gebaute Firmware meldet `dev` und wird nie ersetzt.
+Voraussetzung: C6 und Sensoren laufen mindestens einmal mit der
+update-faehigen Firmware (einmalig per USB flashen). Abschalten mit
+`FIRMWARE.ENABLED=false`.
+
 ### Updates des Collectors
 
 Wie beim Webserver (siehe *Releases und Updates*), nur als normaler Benutzer
