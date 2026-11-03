@@ -4,6 +4,7 @@ import Model.Actuator;
 import Model.Device;
 import Model.Measurement;
 import Model.Sensor;
+import Model.Setting;
 import Model.UserAccount;
 import Model.UserDevice;
 
@@ -24,7 +25,7 @@ public final class DatabaseSetup {
 
     // Every module registers all entities so both sides keep the same schema
     public static final List<Class> ENTITIES = List.of(Device.class, Sensor.class, Measurement.class,
-            Actuator.class, UserAccount.class, UserDevice.class);
+            Actuator.class, UserAccount.class, UserDevice.class, Setting.class);
 
     /** Local port forwarding to the database (implemented by the collector's SSH tunnel). */
     public interface Tunnel {

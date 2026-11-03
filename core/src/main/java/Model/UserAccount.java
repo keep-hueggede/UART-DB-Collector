@@ -29,10 +29,21 @@ public class UserAccount {
     @Column(name = "PictureUrl")
     private String pictureUrl;
 
+    // NULL (accounts from before roles existed) counts as USER
+    @Column(name = "Role")
+    @Enumerated(EnumType.STRING)
+    private Role role;
+
+    @Temporal(TemporalType.TIMESTAMP)
+    @Column(name = "LastLoginAt")
+    private Date lastLoginAt;
+
     @CreationTimestamp
     @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "CreatedAt")
     private Date createdAt;
+
+    public enum Role { ADMIN, USER }
 
     public UserAccount() {}
 
@@ -53,4 +64,9 @@ public class UserAccount {
     public void setEmail(String email) { this.email = email; }
     public void setName(String name) { this.name = name; }
     public void setPictureUrl(String pictureUrl) { this.pictureUrl = pictureUrl; }
+    public Role getRole() { return role == null ? Role.USER : role; }
+    public void setRole(Role role) { this.role = role; }
+    public boolean isAdmin() { return getRole() == Role.ADMIN; }
+    public Date getLastLoginAt() { return lastLoginAt; }
+    public void setLastLoginAt(Date lastLoginAt) { this.lastLoginAt = lastLoginAt; }
 }
