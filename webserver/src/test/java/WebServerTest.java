@@ -1,13 +1,15 @@
-import Model.Actuator;
 import Model.Device;
 import Model.Measurement;
 import Model.Sensor;
 import Model.UserAccount;
 import Model.UserDevice;
+import ORMUtil.DatabaseSetup;
 import ORMUtil.ORMapper;
 import Repository.Repositories;
+import WebServer.AppSettings;
 import WebServer.GoogleAuth;
 import WebServer.SessionManager;
+import WebServer.SetupService;
 import WebServer.WebServer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -17,6 +19,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.file.Files;
 import java.sql.Timestamp;
 import java.util.Date;
 import java.util.List;
@@ -24,9 +27,9 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * End-to-end test of the web server: seeds users/devices/ownership through
- * the ORMapper, boots the server on a random port and verifies auth,
- * per-user data scoping, device linking and the static PWA over HTTP.
+ * End-to-end test of the web server: seeds users/devices/assignments through
+ * the ORMapper, boots the server on a random port and verifies auth, roles,
+ * per-user data scoping, admin functions and the static PWA over HTTP.
  */
 public class WebServerTest {
 
@@ -36,28 +39,36 @@ public class WebServerTest {
     private String base;
     private String aliceToken;
     private String bobToken;
+    private String adminToken;   // carol
+    private String daveToken;    // registered, nothing assigned yet
+    private SetupService setup;
 
     private final HttpClient http = HttpClient.newHttpClient();
     private final ObjectMapper json = new ObjectMapper();
 
     @BeforeEach
     public void setUp() throws Exception {
-        this.mapper = new ORMapper("localhost", 3306, "webtest", "sa", "", "h2",
-                List.of(Device.class, Sensor.class, Measurement.class, Actuator.class,
-                        UserAccount.class, UserDevice.class));
+        this.mapper = new ORMapper("localhost", 3306, "webtest", "sa", "", "h2", DatabaseSetup.ENTITIES);
         this.mapper.connect();
         seedDatabase();
 
         this.sessions = new SessionManager();
         // Google not configured in tests -> flow endpoints must degrade safely
         GoogleAuth google = new GoogleAuth("", "", "");
-        this.server = new WebServer(Repositories.of(this.mapper), sessions, google,
+        Repositories repos = Repositories.of(this.mapper);
+        AppSettings settings = new AppSettings(repos.settings(), google, sessions);
+        settings.apply();
+        this.setup = new SetupService(repos.users(), Files.createTempDirectory("setup"));
+        this.setup.init();   // an admin exists -> setup stays closed
+        this.server = new WebServer(repos, sessions, google, settings, setup,
                 "127.0.0.1", 0, "./does-not-exist", false);
         this.server.start();
         this.base = "http://127.0.0.1:" + this.server.getPort();
 
         this.aliceToken = sessions.create(findUser("alice@test.example"));
         this.bobToken = sessions.create(findUser("bob@test.example"));
+        this.adminToken = sessions.create(findUser("carol@test.example"));
+        this.daveToken = sessions.create(findUser("dave@test.example"));
     }
 
     @AfterEach
@@ -76,12 +87,13 @@ public class WebServerTest {
         session.createQuery("DELETE FROM Sensor").executeUpdate();
         session.createQuery("DELETE FROM Device").executeUpdate();
         session.createQuery("DELETE FROM UserAccount").executeUpdate();
+        session.createQuery("DELETE FROM Setting").executeUpdate();
         session.getTransaction().commit();
 
-        UserAccount alice = new UserAccount("sub-alice", "alice@test.example", "Alice", "https://example.com/a.png");
-        UserAccount bob = new UserAccount("sub-bob", "bob@test.example", "Bob", "");
-        this.mapper.persist(alice);
-        this.mapper.persist(bob);
+        UserAccount alice = user("sub-alice", "alice@test.example", "Alice", UserAccount.Role.USER);
+        UserAccount bob = user("sub-bob", "bob@test.example", "Bob", UserAccount.Role.USER);
+        user("sub-carol", "carol@test.example", "Carol", UserAccount.Role.ADMIN);
+        user("sub-dave", "dave@test.example", "Dave", UserAccount.Role.USER);
 
         Device wetter1 = seedDevice("wetter1", alice);   // owned by alice
         Device wetter2 = seedDevice("wetter2", bob);     // owned by bob
@@ -97,6 +109,13 @@ public class WebServerTest {
         setTimestamp(22.0, "2026-01-01 11:00:00");
         setTimestamp(24.0, "2026-01-01 12:00:00");
         this.mapper.clear();
+    }
+
+    private UserAccount user(String sub, String email, String name, UserAccount.Role role) {
+        UserAccount u = new UserAccount(sub, email, name, "");
+        u.setRole(role);
+        this.mapper.persist(u);
+        return u;
     }
 
     private Device seedDevice(String name, UserAccount owner) {
@@ -174,6 +193,10 @@ public class WebServerTest {
         if (token != null) rb.header("Authorization", "Bearer " + token);
         if (contentType != null) rb.header("Content-Type", contentType);
         return http.send(rb.build(), HttpResponse.BodyHandlers.ofString());
+    }
+
+    private int userId(String email) {
+        return findUser(email).getId();
     }
 
     private int deviceId(String name, String token) throws Exception {
@@ -297,7 +320,7 @@ public class WebServerTest {
     public void calibrationCorrectsDisplayedValues() throws Exception {
         int temp = sensorIdByType("wetter1", "TEMPERATURE");
         String ct = "application/json";
-        assertEquals(200, put("/api/sensors/" + temp + "/calibration", aliceToken, ct,
+        assertEquals(200, put("/api/sensors/" + temp + "/calibration", adminToken, ct,
                 "{\"factor\":1.0,\"offset\":-1.0}").statusCode());
 
         JsonNode body = json.readTree(get("/api/measurements?sensorId=" + temp, aliceToken).body());
@@ -307,16 +330,20 @@ public class WebServerTest {
     }
 
     @Test
-    public void calibrationRejectsBadInputAndForeignSensors() throws Exception {
+    public void calibrationRejectsBadInputAndNonAdmins() throws Exception {
         int temp = sensorIdByType("wetter1", "TEMPERATURE");
         String path = "/api/sensors/" + temp + "/calibration";
         String ct = "application/json";
-        assertEquals(415, put(path, aliceToken, "text/plain", "{\"factor\":1,\"offset\":0}").statusCode());
-        assertEquals(400, put(path, aliceToken, ct, "{\"factor\":1}").statusCode());
-        assertEquals(400, put(path, aliceToken, ct, "{\"factor\":\"1\",\"offset\":0}").statusCode());
-        assertEquals(400, put(path, aliceToken, ct, "{\"factor\":0,\"offset\":0}").statusCode());
-        assertEquals(400, put(path, aliceToken, ct, "{\"factor\":1,\"offset\":99999}").statusCode());
-        assertEquals(404, put(path, bobToken, ct, "{\"factor\":1,\"offset\":-1}").statusCode());
+        assertEquals(415, put(path, adminToken, "text/plain", "{\"factor\":1,\"offset\":0}").statusCode());
+        assertEquals(400, put(path, adminToken, ct, "{\"factor\":1}").statusCode());
+        assertEquals(400, put(path, adminToken, ct, "{\"factor\":\"1\",\"offset\":0}").statusCode());
+        assertEquals(400, put(path, adminToken, ct, "{\"factor\":0,\"offset\":0}").statusCode());
+        assertEquals(400, put(path, adminToken, ct, "{\"factor\":1,\"offset\":99999}").statusCode());
+        assertEquals(404, put("/api/sensors/999999/calibration", adminToken, ct,
+                "{\"factor\":1,\"offset\":-1}").statusCode());
+        // users can read the sensor but must not change it
+        assertEquals(403, put(path, aliceToken, ct, "{\"factor\":1,\"offset\":-1}").statusCode());
+        assertEquals(403, put(path, bobToken, ct, "{\"factor\":1,\"offset\":-1}").statusCode());
         assertEquals(401, put(path, null, ct, "{\"factor\":1,\"offset\":-1}").statusCode());
         assertEquals(405, get(path, aliceToken).statusCode());
     }
@@ -363,83 +390,151 @@ public class WebServerTest {
         assertEquals(404, get("/api/sensors/abc", aliceToken).statusCode());
     }
 
-    // ------------------------------------------------- device management
+    // --------------------------------------------------------------- roles
 
     @Test
-    public void availableListsExcludesOwnDevices() throws Exception {
-        JsonNode avail = json.readTree(get("/api/devices/available", aliceToken).body());
-        // alice owns wetter1 -> sees wetter2 + wetter3, never her own
-        assertEquals(2, avail.size());
-        for (JsonNode d : avail) {
-            assertNotEquals("wetter1", d.get("name").asText());
-            // identity only - available devices must not leak values
-            assertFalse(d.has("lastMeasurement"));
-            assertFalse(d.has("location"));
+    public void adminSeesAllDevicesUsersOnlyAssignedOnes() throws Exception {
+        assertEquals(3, json.readTree(get("/api/devices", adminToken).body()).size(),
+                "admin sees assigned and unassigned devices");
+        assertEquals(3, json.readTree(get("/api/sensors", adminToken).body()).size());
+        assertEquals(0, json.readTree(get("/api/devices", daveToken).body()).size());
+        assertEquals(0, json.readTree(get("/api/sensors", daveToken).body()).size());
+        assertEquals(0, json.readTree(get("/api/measurements/latest", daveToken).body()).size());
+    }
+
+    @Test
+    public void authMeReportsRoleAndApproval() throws Exception {
+        JsonNode admin = json.readTree(get("/api/auth/me", adminToken).body());
+        assertEquals("ADMIN", admin.get("role").asText());
+        assertTrue(admin.get("approved").asBoolean());
+        JsonNode alice = json.readTree(get("/api/auth/me", aliceToken).body());
+        assertEquals("USER", alice.get("role").asText());
+        assertTrue(alice.get("approved").asBoolean());
+        JsonNode dave = json.readTree(get("/api/auth/me", daveToken).body());
+        assertFalse(dave.get("approved").asBoolean(), "nothing assigned yet -> waiting for approval");
+    }
+
+    @Test
+    public void adminEndpointsAreForbiddenForUsers() throws Exception {
+        String ct = "application/json";
+        int dave = userId("dave@test.example");
+        for (String path : List.of("/api/admin/users", "/api/admin/settings")) {
+            assertEquals(403, get(path, aliceToken).statusCode(), path);
+            assertEquals(401, get(path, null).statusCode(), path);
+        }
+        assertEquals(403, put("/api/admin/users/" + dave + "/role", aliceToken, ct,
+                "{\"role\":\"ADMIN\"}").statusCode());
+        assertEquals(403, put("/api/admin/users/" + dave + "/devices/1", aliceToken, ct, "").statusCode());
+        assertEquals(403, put("/api/admin/settings", aliceToken, ct, "{}").statusCode());
+    }
+
+    @Test
+    public void selfServiceDeviceEndpointsAreGone() throws Exception {
+        int id = deviceId("wetter1", aliceToken);
+        assertEquals(405, post("/api/devices", aliceToken, "{\"name\":\"x\"}").statusCode());
+        assertEquals(405, delete("/api/devices/" + id, aliceToken).statusCode());
+        assertEquals(404, get("/api/devices/" + id + "/link", aliceToken).statusCode());
+    }
+
+    @Test
+    public void adminListsUsersWithRolesAndDevices() throws Exception {
+        JsonNode users = json.readTree(get("/api/admin/users", adminToken).body());
+        assertEquals(4, users.size());
+        for (JsonNode u : users) {
+            String email = u.get("email").asText();
+            if (email.equals("carol@test.example")) assertEquals("ADMIN", u.get("role").asText());
+            if (email.equals("alice@test.example")) assertEquals(1, u.get("deviceIds").size());
+            if (email.equals("dave@test.example")) assertEquals(0, u.get("deviceIds").size());
+            assertFalse(u.has("googleSub"), "google subject id stays internal");
         }
     }
 
     @Test
-    public void linkExistingDeviceById() throws Exception {
-        JsonNode avail = json.readTree(get("/api/devices/available", aliceToken).body());
-        int wetter3 = -1;
-        for (JsonNode d : avail) {
-            if (d.get("name").asText().equals("wetter3")) wetter3 = d.get("id").asInt();
-        }
-        assertTrue(wetter3 > 0);
+    public void adminAssignsAndRemovesDevices() throws Exception {
+        int dave = userId("dave@test.example");
+        int wetter3 = deviceId("wetter3", adminToken);
+        String path = "/api/admin/users/" + dave + "/devices/" + wetter3;
+        String ct = "application/json";
 
-        JsonNode linked = json.readTree(
-                post("/api/devices", aliceToken, "{\"deviceId\":" + wetter3 + "}").body());
-        assertEquals("wetter3", linked.get("name").asText());
-        assertFalse(linked.get("created").asBoolean());
+        assertEquals(200, put(path, adminToken, ct, "").statusCode());
+        assertEquals(200, put(path, adminToken, ct, "").statusCode(), "assigning twice is harmless");
+        JsonNode devices = json.readTree(get("/api/devices", daveToken).body());
+        assertEquals(1, devices.size());
+        assertEquals("wetter3", devices.get(0).get("name").asText());
+        assertTrue(json.readTree(get("/api/auth/me", daveToken).body()).get("approved").asBoolean());
 
-        JsonNode devices = json.readTree(get("/api/devices", aliceToken).body());
-        assertEquals(2, devices.size());
+        assertTrue(json.readTree(delete(path, adminToken).body()).get("removed").asBoolean());
+        assertEquals(0, json.readTree(get("/api/devices", daveToken).body()).size());
+        assertFalse(json.readTree(delete(path, adminToken).body()).get("removed").asBoolean());
 
-        // idempotent double link
-        HttpResponse<String> again = post("/api/devices", aliceToken, "{\"deviceId\":" + wetter3 + "}");
-        assertEquals(200, again.statusCode());
-
-        // unlink again
-        HttpResponse<String> un = delete("/api/devices/" + wetter3, aliceToken);
-        assertEquals(200, un.statusCode());
-        assertTrue(json.readTree(un.body()).get("unlinked").asBoolean());
-        assertEquals(1, json.readTree(get("/api/devices", aliceToken).body()).size());
+        assertEquals(404, put("/api/admin/users/999999/devices/" + wetter3, adminToken, ct, "").statusCode());
+        assertEquals(404, put("/api/admin/users/" + dave + "/devices/999999", adminToken, ct, "").statusCode());
+        assertEquals(404, put("/api/admin/users/x/devices/" + wetter3, adminToken, ct, "").statusCode());
     }
 
     @Test
-    public void linkUnknownDeviceIdIsNotFound() throws Exception {
-        HttpResponse<String> res = post("/api/devices", aliceToken, "{\"deviceId\":999999}");
-        assertEquals(404, res.statusCode());
-        assertEquals(400, post("/api/devices", aliceToken, "{}").statusCode());
+    public void promotionTakesEffectImmediately() throws Exception {
+        int dave = userId("dave@test.example");
+        String path = "/api/admin/users/" + dave + "/role";
+        String ct = "application/json";
+        assertEquals(403, get("/api/admin/users", daveToken).statusCode());
+        assertEquals(200, put(path, adminToken, ct, "{\"role\":\"ADMIN\"}").statusCode());
+        // same session, no new login needed
+        assertEquals(200, get("/api/admin/users", daveToken).statusCode());
+        assertEquals(3, json.readTree(get("/api/devices", daveToken).body()).size());
+
+        assertEquals(200, put(path, adminToken, ct, "{\"role\":\"USER\"}").statusCode());
+        assertEquals(403, get("/api/admin/users", daveToken).statusCode());
     }
 
     @Test
-    public void addDeviceByNameCreatesAndLinks() throws Exception {
-        JsonNode created = json.readTree(
-                post("/api/devices", aliceToken, "{\"name\":\"neu1\"}").body());
-        assertTrue(created.get("created").asBoolean());
-        assertEquals("neu1", created.get("name").asText());
+    public void lastAdminCannotBeDemoted() throws Exception {
+        String path = "/api/admin/users/" + userId("carol@test.example") + "/role";
+        String ct = "application/json";
+        assertEquals(409, put(path, adminToken, ct, "{\"role\":\"USER\"}").statusCode());
+        assertEquals(200, get("/api/admin/users", adminToken).statusCode(), "still admin");
 
-        JsonNode devices = json.readTree(get("/api/devices", aliceToken).body());
-        assertEquals(2, devices.size());
-
-        // control chars in names are rejected
-        assertEquals(400, post("/api/devices", aliceToken, "{\"name\":\"bad\\u0000name\"}").statusCode());
+        assertEquals(400, put(path, adminToken, ct, "{\"role\":\"ROOT\"}").statusCode());
+        assertEquals(400, put(path, adminToken, ct, "{}").statusCode());
+        assertEquals(415, put(path, adminToken, "text/plain", "{\"role\":\"USER\"}").statusCode());
+        assertEquals(404, put("/api/admin/users/999999/role", adminToken, ct,
+                "{\"role\":\"USER\"}").statusCode());
     }
 
     @Test
-    public void unlinkOfNeverLinkedDeviceIsSafe() throws Exception {
-        HttpResponse<String> res = delete("/api/devices/999999", aliceToken);
+    public void adminEditsSettingsSecretStaysHidden() throws Exception {
+        String ct = "application/json";
+        HttpResponse<String> res = put("/api/admin/settings", adminToken, ct,
+                "{\"googleClientId\":\"cid\",\"googleClientSecret\":\"very-secret\",\"sessionTtlDays\":14}");
         assertEquals(200, res.statusCode());
-        assertFalse(json.readTree(res.body()).get("unlinked").asBoolean());
+        assertFalse(res.body().contains("very-secret"));
+        JsonNode view = json.readTree(get("/api/admin/settings", adminToken).body());
+        assertEquals("cid", view.get("googleClientId").asText());
+        assertTrue(view.get("googleClientSecretSet").asBoolean());
+        assertEquals(14, view.get("sessionTtlDays").asInt());
+        // Google is configured now -> login redirects instead of 503
+        assertEquals(302, get("/auth/login", null).statusCode());
+
+        assertEquals(400, put("/api/admin/settings", adminToken, ct, "{\"sessionTtlDays\":0}").statusCode());
+        assertEquals(400, put("/api/admin/settings", adminToken, ct, "{\"sessionTtlDays\":\"x\"}").statusCode());
+        assertEquals(400, put("/api/admin/settings", adminToken, ct, "[1]").statusCode());
+        assertEquals(415, put("/api/admin/settings", adminToken, "text/plain", "{}").statusCode());
+    }
+
+    @Test
+    public void setupIsClosedOnceAnAdminExists() throws Exception {
+        JsonNode status = json.readTree(get("/api/setup", null).body());
+        assertFalse(status.get("setupRequired").asBoolean());
+        assertFalse(status.has("codeFile"), "code location only while setup is open");
+        assertEquals(409, post("/api/setup", null, "{\"code\":\"whatever\"}").statusCode());
     }
 
     // --------------------------------------------------------------- rename
 
     @Test
-    public void renameOwnDevice() throws Exception {
+    public void adminRenamesDevice() throws Exception {
         int id = deviceId("wetter1", aliceToken);
-        HttpResponse<String> res = put("/api/devices/" + id, aliceToken,
+        HttpResponse<String> res = put("/api/devices/" + id, adminToken,
                 "application/json", "{\"name\":\"  Garten <Nord>  \"}");
         assertEquals(200, res.statusCode());
         JsonNode devices = json.readTree(get("/api/devices", aliceToken).body());
@@ -448,12 +543,13 @@ public class WebServerTest {
     }
 
     @Test
-    public void renameRequiresOwnership() throws Exception {
+    public void renameIsAdminOnly() throws Exception {
         int aliceDevice = deviceId("wetter1", aliceToken);
-        // bob does not own it -> indistinguishable from a missing device
-        assertEquals(404, put("/api/devices/" + aliceDevice, bobToken,
+        assertEquals(403, put("/api/devices/" + aliceDevice, aliceToken,
                 "application/json", "{\"name\":\"x\"}").statusCode());
-        assertEquals(404, put("/api/devices/999999", aliceToken,
+        assertEquals(403, put("/api/devices/" + aliceDevice, bobToken,
+                "application/json", "{\"name\":\"x\"}").statusCode());
+        assertEquals(404, put("/api/devices/999999", adminToken,
                 "application/json", "{\"name\":\"x\"}").statusCode());
         assertEquals(401, put("/api/devices/" + aliceDevice, null,
                 "application/json", "{\"name\":\"x\"}").statusCode());
@@ -465,18 +561,18 @@ public class WebServerTest {
     @Test
     public void renameRejectsBadInput() throws Exception {
         int id = deviceId("wetter1", aliceToken);
+        String path = "/api/devices/" + id;
         String ct = "application/json";
-        assertEquals(415, put("/api/devices/" + id, aliceToken, "text/plain", "{\"name\":\"x\"}").statusCode());
-        assertEquals(415, put("/api/devices/" + id, aliceToken, null, "{\"name\":\"x\"}").statusCode());
-        assertEquals(400, put("/api/devices/" + id, aliceToken, ct, "").statusCode());
-        assertEquals(400, put("/api/devices/" + id, aliceToken, ct, "{}").statusCode());
-        assertEquals(400, put("/api/devices/" + id, aliceToken, ct, "{\"name\":\"\"}").statusCode());
-        assertEquals(400, put("/api/devices/" + id, aliceToken, ct, "{\"name\":\"a\\nb\"}").statusCode());
-        assertEquals(400, put("/api/devices/" + id, aliceToken, ct,
-                "{\"name\":\"" + "x".repeat(41) + "\"}").statusCode());
-        assertEquals(400, put("/api/devices/" + id, aliceToken, ct, "not json").statusCode());
-        assertEquals(400, put("/api/devices/" + id, aliceToken, ct, "{\"name\":5}").statusCode());
-        assertEquals(413, put("/api/devices/" + id, aliceToken, ct, "x".repeat(9000)).statusCode());
+        assertEquals(415, put(path, adminToken, "text/plain", "{\"name\":\"x\"}").statusCode());
+        assertEquals(415, put(path, adminToken, null, "{\"name\":\"x\"}").statusCode());
+        assertEquals(400, put(path, adminToken, ct, "").statusCode());
+        assertEquals(400, put(path, adminToken, ct, "{}").statusCode());
+        assertEquals(400, put(path, adminToken, ct, "{\"name\":\"\"}").statusCode());
+        assertEquals(400, put(path, adminToken, ct, "{\"name\":\"a\\nb\"}").statusCode());
+        assertEquals(400, put(path, adminToken, ct, "{\"name\":\"" + "x".repeat(41) + "\"}").statusCode());
+        assertEquals(400, put(path, adminToken, ct, "not json").statusCode());
+        assertEquals(400, put(path, adminToken, ct, "{\"name\":5}").statusCode());
+        assertEquals(413, put(path, adminToken, ct, "x".repeat(9000)).statusCode());
         // input was rejected, name unchanged
         assertEquals("wetter1",
                 json.readTree(get("/api/devices", aliceToken).body()).get(0).get("name").asText());
@@ -486,7 +582,7 @@ public class WebServerTest {
     public void renameRejectsDuplicateName() throws Exception {
         this.mapper.persist(new Device("garten2", Device.DeviceType.SENSOR, "test"));
         int id = deviceId("wetter1", aliceToken);
-        assertEquals(409, put("/api/devices/" + id, aliceToken,
+        assertEquals(409, put("/api/devices/" + id, adminToken,
                 "application/json", "{\"name\":\"garten2\"}").statusCode());
     }
 
@@ -495,7 +591,7 @@ public class WebServerTest {
         int id = deviceId("wetter1", aliceToken);
         assertEquals(405, get("/api/devices/" + id, aliceToken).statusCode());
         assertEquals(405, post("/api/devices/" + id, aliceToken, "{\"name\":\"x\"}").statusCode());
-        assertEquals(405, put("/api/devices/" + id + "/link", aliceToken,
+        assertEquals(404, put("/api/devices/" + id + "/link", adminToken,
                 "application/json", "{\"name\":\"x\"}").statusCode());
     }
 

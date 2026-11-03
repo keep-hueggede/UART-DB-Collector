@@ -6,6 +6,7 @@ import Model.UserDevice;
 import ORMUtil.DatabaseSetup;
 import ORMUtil.ORMapper;
 import Repository.Repositories;
+import Repository.Viewer;
 import org.junit.jupiter.api.*;
 
 import java.util.Date;
@@ -19,8 +20,8 @@ public class Test_Calibration {
 
     private ORMapper mapper;
     private Repositories repos;
-    private int alice;
-    private int bob;
+    private Viewer alice;
+    private Viewer bob;
     private int sensorId;
 
     @BeforeEach
@@ -43,8 +44,8 @@ public class Test_Calibration {
         mapper.persist(new Measurement(temp, 22.0, new Date(2_000_000L)));
         mapper.clear();
 
-        alice = a.getId();
-        bob = b.getId();
+        alice = new Viewer(a.getId(), false);
+        bob = new Viewer(b.getId(), false);
         sensorId = temp.getId();
         repos = Repositories.of(mapper);
     }
@@ -70,7 +71,7 @@ public class Test_Calibration {
         assertEquals(22.0, (Double) latest.get("value"), 1e-9);
         assertEquals(22.0, (Double) latest.get("rawValue"), 1e-9);
         @SuppressWarnings("unchecked")
-        Map<String, Object> cal = (Map<String, Object>) repos.sensors().findLinked(alice, sensorId).get("calibration");
+        Map<String, Object> cal = (Map<String, Object>) repos.sensors().findVisible(alice, sensorId).get("calibration");
         assertEquals(1.0, cal.get("factor"));
         assertEquals(0.0, cal.get("offset"));
     }
