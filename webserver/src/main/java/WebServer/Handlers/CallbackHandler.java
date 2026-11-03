@@ -64,7 +64,7 @@ public class CallbackHandler implements Handler {
             String token = sessions.create(user);
 
             call.addHeader("Set-Cookie",
-                    SessionManager.buildCookie(token, secureCookie, SessionManager.SESSION_TTL_MS / 1000));
+                    SessionManager.buildCookie(token, secureCookie, sessions.getTtlMs() / 1000));
             call.addHeader("Set-Cookie", LoginHandler.STATE_COOKIE + "=; Path=/auth; Max-Age=0; HttpOnly; SameSite=Lax"
                     + (secureCookie ? "; Secure" : ""));
             // token in the fragment: never sent to the server, picked up by the

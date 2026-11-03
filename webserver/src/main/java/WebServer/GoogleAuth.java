@@ -34,28 +34,35 @@ public class GoogleAuth {
 
     private static final Pattern SAFE_HOST = Pattern.compile("[A-Za-z0-9.\\-]+(:[0-9]+)?");
 
-    private final String clientId;
-    private final String clientSecret;
-    private final String configuredRedirectUri;
+    /** One consistent set of client values; replaced as a whole when an admin changes them. */
+    private record Client(String id, String secret, String redirectUri) {}
 
-    private final HttpClient http = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(10))
-            .build();
+    private volatile Client client;
+
+    // created on first login, so an unconfigured server opens no client sockets
+    private HttpClient http;
     private final ObjectMapper json = new ObjectMapper();
 
     public GoogleAuth(String clientId, String clientSecret, String configuredRedirectUri) {
-        this.clientId = clientId == null ? "" : clientId.trim();
-        this.clientSecret = clientSecret == null ? "" : clientSecret.trim();
-        this.configuredRedirectUri = configuredRedirectUri == null ? "" : configuredRedirectUri.trim();
+        configure(clientId, clientSecret, configuredRedirectUri);
+    }
+
+    /** Applies new client values at runtime (settings page / first-run setup). */
+    public void configure(String clientId, String clientSecret, String configuredRedirectUri) {
+        this.client = new Client(clientId == null ? "" : clientId.trim(),
+                clientSecret == null ? "" : clientSecret.trim(),
+                configuredRedirectUri == null ? "" : configuredRedirectUri.trim());
     }
 
     public boolean isConfigured() {
-        return !clientId.isEmpty() && !clientSecret.isEmpty();
+        Client c = client;
+        return !c.id().isEmpty() && !c.secret().isEmpty();
     }
 
     /** The redirect URI for a given request (config override or request host). */
     public String redirectUri(String scheme, String hostHeader) {
-        if (!configuredRedirectUri.isEmpty()) return configuredRedirectUri;
+        String configured = client.redirectUri();
+        if (!configured.isEmpty()) return configured;
         String schemeNorm = (scheme == null || scheme.isEmpty()) ? "http" : scheme;
         String host = hostHeader == null ? "" : hostHeader.trim();
         if (!SAFE_HOST.matcher(host).matches()) {
@@ -67,7 +74,7 @@ public class GoogleAuth {
     /** Authorization URL the browser is redirected to. */
     public String loginUrl(String redirectUri, String state) {
         return AUTH_ENDPOINT
-                + "?client_id=" + enc(clientId)
+                + "?client_id=" + enc(client.id())
                 + "&redirect_uri=" + enc(redirectUri)
                 + "&response_type=code"
                 + "&scope=" + enc("openid email profile")
@@ -96,9 +103,10 @@ public class GoogleAuth {
      * treats that as "login failed" and never creates a session.
      */
     public GoogleUser exchangeCode(String code, String redirectUri) throws IOException, InterruptedException {
+        Client c = client;
         String body = "code=" + enc(code)
-                + "&client_id=" + enc(clientId)
-                + "&client_secret=" + enc(clientSecret)
+                + "&client_id=" + enc(c.id())
+                + "&client_secret=" + enc(c.secret())
                 + "&redirect_uri=" + enc(redirectUri)
                 + "&grant_type=authorization_code";
 
@@ -107,7 +115,7 @@ public class GoogleAuth {
                 .header("Content-Type", "application/x-www-form-urlencoded")
                 .POST(HttpRequest.BodyPublishers.ofString(body))
                 .build();
-        HttpResponse<String> res = http.send(req, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> res = http().send(req, HttpResponse.BodyHandlers.ofString());
         if (res.statusCode() != 200) {
             // never echo the response body - it can contain request details
             throw new IOException("token exchange failed (HTTP " + res.statusCode() + ")");
@@ -127,7 +135,7 @@ public class GoogleAuth {
             String iss = idTokenClaims.path("iss").asText("");
             long exp = idTokenClaims.path("exp").asLong(0);
             boolean issOk = iss.equals("https://accounts.google.com") || iss.equals("accounts.google.com");
-            boolean audOk = idTokenAud == null || idTokenAud.equals(clientId);
+            boolean audOk = idTokenAud == null || idTokenAud.equals(c.id());
             if (!issOk || !audOk || exp * 1000L < System.currentTimeMillis()) {
                 throw new IOException("id_token claim validation failed");
             }
@@ -147,7 +155,7 @@ public class GoogleAuth {
                 .header("Authorization", "Bearer " + accessToken)
                 .GET()
                 .build();
-        HttpResponse<String> res = http.send(req, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> res = http().send(req, HttpResponse.BodyHandlers.ofString());
         if (res.statusCode() != 200) return null;
 
         JsonNode info = json.readTree(res.body());
@@ -175,6 +183,13 @@ public class GoogleAuth {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    private synchronized HttpClient http() {
+        if (http == null) {
+            http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+        }
+        return http;
     }
 
     private static String enc(String s) {

@@ -48,6 +48,17 @@ public class SessionManager {
         }
     }
 
+    private volatile long ttlMs = SESSION_TTL_MS;
+
+    /** Session lifetime for new logins (settings page). */
+    public void setTtlMs(long ttlMs) {
+        this.ttlMs = ttlMs;
+    }
+
+    public long getTtlMs() {
+        return ttlMs;
+    }
+
     /** key = sha256(token) -> session */
     private final Map<String, Session> sessions = new ConcurrentHashMap<>();
 
@@ -58,7 +69,7 @@ public class SessionManager {
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(raw);
         sessions.put(hash(token), new Session(
                 user.getId(), user.getEmail(), user.getName(), user.getPictureUrl(),
-                System.currentTimeMillis() + SESSION_TTL_MS));
+                System.currentTimeMillis() + ttlMs));
         purgeExpired();
         return token;
     }
