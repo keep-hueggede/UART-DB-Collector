@@ -66,7 +66,7 @@ public class Test_DatabaseSetup {
         try {
             assertTrue(db.ping());
             assertFalse(db.tunnelLost());
-            mapper.persist(new UserAccount("sub", "a@test.example", "A", ""));
+            mapper.persist(new UserAccount("sub-" + System.nanoTime(), "a@test.example", "A", ""));
             db.reconnect();
             assertTrue(db.ping());
         } finally {
