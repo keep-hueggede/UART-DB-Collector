@@ -152,7 +152,7 @@ function chartGeo(points, box) {
 }
 
 const SPARK_BOX = { W: 120, H: 34, L: 3, R: 3, T: 3, B: 3 };
-const CHART_BOX = { W: 600, H: 240, L: 44, R: 12, T: 14, B: 26 };
+const CHART_BOX = { W: 600, H: 240, L: 44, R: 12, T: 14, B: 26 };  // W/H follow the box size
 
 function sparkline(points, g) {
   const d = points.map((p, i) => (i ? "L" : "M") + g.x(p.t).toFixed(1) + " " + g.y(Number(p.v)).toFixed(1)).join(" ");
@@ -169,12 +169,26 @@ function renderSparkline(slot, points, unit) {
   attachChartHover(slot, points, g, unit, { mouseOnly: true });
 }
 
+// Drawn at the box's real width so labels keep their size on phones
 function renderBigChart(box, points, unit) {
+  lastChart = { box, points, unit };
   if (!points || points.length === 0) { box.innerHTML = bigChart(points, unit); return; }
-  const g = chartGeo(points, CHART_BOX);
+  const width = Math.max(280, Math.min(900, box.clientWidth - 16));
+  const g = chartGeo(points, { ...CHART_BOX, W: width, H: width < 480 ? 220 : 240 });
   box.innerHTML = bigChart(points, unit, g);
   attachChartHover(box, points, g, unit, { mouseOnly: false });
 }
+
+let lastChart = null;
+let resizeTimer = null;
+window.addEventListener("resize", () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    if (lastChart && !$("view-detail").classList.contains("hidden")) {
+      renderBigChart(lastChart.box, lastChart.points, lastChart.unit);
+    }
+  }, 150);
+});
 
 // Shows the nearest data point (guide line, dot, value + time) under mouse or finger
 function attachChartHover(container, points, g, unit, { mouseOnly }) {
@@ -322,6 +336,7 @@ function showApp(me) {
     $("user-chip").classList.remove("hidden");
     $("btn-logout").classList.remove("hidden");
     $("user-name").textContent = me.name || me.email || "";
+    $("user-name").dataset.initial = (me.name || me.email || "?").trim().charAt(0).toUpperCase();
     const pic = $("user-pic");
     if (me.picture && /^https:\/\//.test(me.picture)) {
       pic.src = me.picture;

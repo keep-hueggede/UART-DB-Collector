@@ -27,6 +27,7 @@ html, body {
 
 body {
   min-height: 100vh;
+  min-height: 100dvh;   /* mobile browsers: excludes the address bar */
   padding-bottom: calc(24px + var(--safe-bottom));
 }
 
@@ -49,10 +50,18 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
-.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
 .logo { width: 28px; height: 28px; color: var(--accent); flex: none; }
 .brand-text { min-width: 0; }
-.brand-text h1 { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: .2px; }
+.brand-text h1 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: .2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .status-line {
   margin: 0;
   font-size: 12px;
@@ -60,7 +69,6 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 55vw;
 }
 .status-line.ok::before,
 .status-line.err::before {
@@ -319,7 +327,7 @@ dialog input, dialog select {
   background: var(--bg);
   color: var(--text);
   font: inherit;
-  font-size: 15px;
+  font-size: 16px;
 }
 dialog .hint { font-size: 12px; color: var(--text-muted); margin: 6px 0 0; }
 dialog code { background: var(--bg-elevated); padding: 1px 5px; border-radius: 5px; }
@@ -549,7 +557,7 @@ body:not(.is-admin) .admin-only { display: none !important; }
   background: var(--bg);
   color: var(--text);
   font: inherit;
-  font-size: 15px;
+  font-size: 16px;
 }
 .setup-step .hint { font-size: 12px; }
 .setup-path {
@@ -585,7 +593,7 @@ body:not(.is-admin) .admin-only { display: none !important; }
   background: var(--bg);
   color: var(--text);
   font: inherit;
-  font-size: 15px;
+  font-size: 16px;
 }
 .admin-panel .hint { font-size: 12px; color: var(--text-muted); margin: 8px 0 0; line-height: 1.5; }
 .admin-panel code { background: var(--bg-elevated); padding: 1px 5px; border-radius: 5px; }
@@ -620,3 +628,54 @@ body:not(.is-admin) .admin-only { display: none !important; }
 }
 .device-chip input { width: auto; margin: 0; accent-color: var(--accent); }
 .device-chip:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+
+/* -------------------------------------------------------------- touch */
+
+/* no double-tap zoom delay, finger-sized targets (>= 40 px) */
+button, input, select, label { touch-action: manipulation; }
+.back-btn { min-height: 44px; padding-right: 12px; }
+.range-tabs button { min-height: 44px; }
+.small-btn { min-height: 40px; padding: 9px 14px; }
+.device-chip { min-height: 40px; padding: 6px 14px 6px 10px; font-size: 13px; }
+.device-chip input { width: 18px; height: 18px; }
+.dialog-actions button { min-height: 44px; }
+.primary-btn { min-height: 44px; }
+dialog { max-height: 90dvh; overflow-y: auto; }
+.login-screen { overflow-y: auto; }
+
+/* ------------------------------------------------------------ phones */
+
+@media (max-width: 480px) {
+  main { padding: 12px 12px 16px; }
+  .topbar { gap: 8px; padding-left: 12px; padding-right: 8px; }
+  .actions { gap: 2px; }
+  .logo { width: 24px; height: 24px; }
+
+  /* user chip shrinks to the picture or the initial */
+  .user-chip { padding: 3px; }
+  .user-name { font-size: 0; }
+  .user-name::before {
+    content: attr(data-initial);
+    display: grid;
+    place-items: center;
+    width: 28px; height: 28px;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .user-chip:has(.user-pic:not(.hidden)) .user-name { display: none; }
+
+  .sensor-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .sensor-card { padding: 12px; }
+  .sensor-name {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  .detail-value { font-size: 38px; margin: 14px 2px 12px; }
+  .range-tabs button { min-width: 0; }
+  .stats-row { gap: 6px; }
+  .stat { padding: 8px 4px; font-size: 13px; }
+  .user-head { flex-wrap: wrap; }
+  .user-head .small-btn { margin-left: auto; }
+}
