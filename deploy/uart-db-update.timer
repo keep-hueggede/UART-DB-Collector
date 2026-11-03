@@ -1,0 +1,12 @@
+# Optional: installs new releases automatically every night.
+
+[Unit]
+Description=Nightly update of UART-DB-Webserver
+
+[Timer]
+OnCalendar=*-*-* 04:00
+RandomizedDelaySec=30min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

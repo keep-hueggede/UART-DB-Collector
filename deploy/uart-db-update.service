@@ -1,0 +1,14 @@
+# Runs /usr/local/bin/uart-db-update once (started by uart-db-update.timer).
+# Install (as root):
+#   cp uart-db-update.service uart-db-update.timer /etc/systemd/system/
+#   systemctl daemon-reload && systemctl enable --now uart-db-update.timer
+# Logs: journalctl -u uart-db-update
+
+[Unit]
+Description=Update UART-DB-Webserver from the latest GitHub release
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/uart-db-update
