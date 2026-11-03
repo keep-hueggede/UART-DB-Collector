@@ -7,6 +7,7 @@ import WebServer.Http.Handler;
 import WebServer.Http.HttpCall;
 import WebServer.OAuthStateStore;
 import WebServer.SessionManager;
+import WebServer.SetupService;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -22,14 +23,16 @@ public class CallbackHandler implements Handler {
     private final OAuthStateStore states;
     private final Repositories repos;
     private final SessionManager sessions;
+    private final SetupService setup;
     private final boolean secureCookie;
 
     public CallbackHandler(GoogleAuth google, OAuthStateStore states, Repositories repos,
-                           SessionManager sessions, boolean secureCookie) {
+                           SessionManager sessions, SetupService setup, boolean secureCookie) {
         this.google = google;
         this.states = states;
         this.repos = repos;
         this.sessions = sessions;
+        this.setup = setup;
         this.secureCookie = secureCookie;
     }
 
@@ -61,6 +64,15 @@ public class CallbackHandler implements Handler {
             String redirectUri = google.redirectUri(call.scheme(), call.header("Host"));
             GoogleAuth.GoogleUser gu = google.exchangeCode(code, redirectUri);
             UserAccount user = repos.users().loginOrCreate(gu.sub, gu.email, gu.name, gu.pictureUrl);
+            // first-run setup: the account that proved the setup code becomes the first admin
+            if (setup.isRequired()) {
+                String claim = SessionManager.extractCookie(cookies == null ? "" : cookies, SetupService.CLAIM_COOKIE);
+                if (setup.completeIfClaimed(claim, user.getId())) {
+                    System.out.println("Einrichtung abgeschlossen: erster Admin ist " + gu.email);
+                    call.addHeader("Set-Cookie", SetupService.CLAIM_COOKIE + "=; Path=/auth; Max-Age=0; HttpOnly; SameSite=Lax"
+                            + (secureCookie ? "; Secure" : ""));
+                }
+            }
             String token = sessions.create(user);
 
             call.addHeader("Set-Cookie",

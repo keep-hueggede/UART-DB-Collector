@@ -4,6 +4,7 @@ import ORMUtil.DatabaseSetup;
 import ORMUtil.ORMapper;
 import Repository.Repositories;
 
+import java.nio.file.Path;
 import java.util.Properties;
 
 /** Entry point of the web server jar: REST API, Google login and PWA, no UART. */
@@ -36,7 +37,11 @@ public class WebMain {
             settings.importFromConfig(prop);
             settings.apply();
 
-            webServer = new WebServer(repos, sessions, google, host, port, webRoot, secureCookie);
+            // no admin yet -> one-time code file in the working directory, setup page in the browser
+            SetupService setup = new SetupService(repos.users(), Path.of("."));
+            setup.init();
+
+            webServer = new WebServer(repos, sessions, google, settings, setup, host, port, webRoot, secureCookie);
             webServer.start();
 
             System.out.println("UART-DB-Webserver gestartet.");

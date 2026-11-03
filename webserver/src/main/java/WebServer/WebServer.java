@@ -36,6 +36,7 @@ public class WebServer {
 
     private final SessionManager sessions;
     private final GoogleAuth google;
+    private final Repositories repos;
     private final String host;
     private final int port;
     private final Router api;
@@ -44,32 +45,39 @@ public class WebServer {
 
     private HttpServer server;
 
-    public WebServer(Repositories repos, SessionManager sessions, GoogleAuth google,
-                     String host, int port, String webRoot, boolean secureCookie) {
+    public WebServer(Repositories repos, SessionManager sessions, GoogleAuth google, AppSettings settings,
+                     SetupService setup, String host, int port, String webRoot, boolean secureCookie) {
         this.sessions = sessions;
         this.google = google;
+        this.repos = repos;
         this.host = host;
         this.port = port;
 
         this.api = new Router()
                 .publicGet("/api/health", new HealthHandler(repos))
-                .get("/api/auth/me", new MeHandler())
+                .publicGet("/api/setup", new SetupStatusHandler(setup, settings, google))
+                .publicRoute("POST", "/api/setup", new SetupHandler(setup, settings, google, secureCookie))
+                // users: read only, scoped to the devices an admin assigned to them
+                .get("/api/auth/me", new MeHandler(repos))
                 .get("/api/devices", new ListDevicesHandler(repos))
-                .post("/api/devices", new LinkDeviceHandler(repos))
-                .get("/api/devices/available", new AvailableDevicesHandler(repos))
-                .post("/api/devices/{id}/link", new LinkDeviceByIdHandler(repos))
-                .put("/api/devices/{id}", new RenameDeviceHandler(repos))
-                .delete("/api/devices/{id}", new UnlinkDeviceHandler(repos))
                 .get("/api/sensors", new ListSensorsHandler(repos))
                 .get("/api/sensors/{id}", new GetSensorHandler(repos))
-                .put("/api/sensors/{id}/calibration", new SetCalibrationHandler(repos))
                 .get("/api/measurements/latest", new LatestMeasurementsHandler(repos))
-                .get("/api/measurements", new MeasurementSeriesHandler(repos));
+                .get("/api/measurements", new MeasurementSeriesHandler(repos))
+                // admins: everything that changes data or affects other users
+                .admin("PUT", "/api/devices/{id}", new RenameDeviceHandler(repos))
+                .admin("PUT", "/api/sensors/{id}/calibration", new SetCalibrationHandler(repos))
+                .admin("GET", "/api/admin/users", new AdminUsersHandler(repos))
+                .admin("PUT", "/api/admin/users/{id}/role", new SetRoleHandler(repos))
+                .admin("PUT", "/api/admin/users/{id}/devices/{deviceId}", new AssignDeviceHandler(repos))
+                .admin("DELETE", "/api/admin/users/{id}/devices/{deviceId}", new AssignDeviceHandler(repos))
+                .admin("GET", "/api/admin/settings", new SettingsHandler(settings))
+                .admin("PUT", "/api/admin/settings", new SettingsHandler(settings));
 
         OAuthStateStore states = new OAuthStateStore();
         this.auth = new Router()
                 .get("/auth/login", new LoginHandler(google, states, secureCookie))
-                .get("/auth/callback", new CallbackHandler(google, states, repos, sessions, secureCookie))
+                .get("/auth/callback", new CallbackHandler(google, states, repos, sessions, setup, secureCookie))
                 .post("/auth/logout", new LogoutHandler(sessions, secureCookie));
 
         this.staticFiles = new StaticFileHandler(webRoot);
@@ -120,6 +128,13 @@ public class WebServer {
                     return;
                 }
                 call.setUser(user);
+                // role is read per request, so promotions/demotions apply immediately
+                boolean admin = repos.users().isAdmin(user.userId);
+                call.setAdmin(admin);
+                if (match.isAdminOnly() && !admin) {
+                    call.error(403, "admin role required");
+                    return;
+                }
             }
             match.dispatch(call, "unknown api endpoint");
         } catch (BodyTooLargeException e) {
