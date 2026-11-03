@@ -52,8 +52,16 @@ mvn verify      # Tests + JaCoCo-Bericht je Modul in */target/site/jacoco/index.
 
 Die GitHub Action (`.github/workflows/maven.yml`) baut bei jedem Push/PR auf
 `main` alle Module, fuehrt die Tests aus, zeigt die Abdeckung je Modul in der
-Job-Zusammenfassung und stellt Test-/Abdeckungsberichte und beide Jars als
-Artefakte bereit.
+Job-Zusammenfassung und stellt Test-/Abdeckungsberichte, die SBOM und beide
+Jars als Artefakte bereit.
+
+### SBOM
+
+`sbom.cdx.json` ist die Software-Stueckliste (CycloneDX 1.6, JSON) aller
+Laufzeit-Abhaengigkeiten von core, collector und webserver mit Version, Lizenz
+und Hashes; Test-Bibliotheken sind nicht enthalten. `mvn package` erzeugt sie
+neu in `target/sbom.cdx.json`. Nach Aenderungen an Abhaengigkeiten die Datei
+ins Repo-Root kopieren und mit committen.
 
 Die Tests laufen ohne externe Infrastruktur: HTTP-Server, SSH-Server und ein
 Stub der Google-Endpunkte werden im Testprozess gestartet. Nur `Test_MySQLConnector` und `Test_UARTCom` sind

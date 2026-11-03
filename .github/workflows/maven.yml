@@ -83,6 +83,12 @@ jobs:
         path: '*/target/surefire-reports/'
         if-no-files-found: ignore
 
+    - name: Upload SBOM
+      uses: actions/upload-artifact@v4
+      with:
+        name: sbom
+        path: target/sbom.cdx.json
+
     - name: Upload jars
       uses: actions/upload-artifact@v4
       with:
