@@ -345,6 +345,8 @@ deshalb immer **beide Jars aus demselben Stand** ausrollen.
 
 ## Projektstruktur
 
+Klassendiagramme (UML) beider Module: [docs/UML.md](docs/UML.md)
+
 ```
 pom.xml                      Parent ("Solution"): Module + Versionen
 core/                        gemeinsame Bibliothek
