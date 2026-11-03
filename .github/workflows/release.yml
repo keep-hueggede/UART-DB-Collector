@@ -1,0 +1,39 @@
+# Builds and tests all modules for a version tag (v1.2.3) and publishes a GitHub
+# Release with both jars, their SHA-256 checksums and the SBOM.
+# Servers update from it with deploy/uart-db-update.sh.
+
+name: Release
+
+on:
+  push:
+    tags: [ "v*" ]
+
+jobs:
+  release:
+
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # create the release
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Build and run unit tests
+      run: mvn -B verify --file pom.xml
+
+    - name: Collect release files
+      run: |
+        mkdir dist
+        cp collector/target/uart-db-collector.jar webserver/target/uart-db-webserver.jar target/sbom.cdx.json dist/
+        cd dist && sha256sum * > SHA256SUMS
+
+    - name: Publish release
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: gh release create "$GITHUB_REF_NAME" dist/* --title "$GITHUB_REF_NAME" --generate-notes --verify-tag
