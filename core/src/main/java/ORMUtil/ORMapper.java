@@ -54,6 +54,8 @@ public class ORMapper extends CommonDbConnector {
         settings.put(Environment.HBM2DDL_AUTO, "update");
         settings.put(Environment.SHOW_SQL, false);
         settings.put(Environment.LOG_JDBC_WARNINGS, false);
+        // DATETIME columns hold UTC, whatever time zone the machine runs in (Pi: Europe/Berlin, server: UTC)
+        settings.put(Environment.JDBC_TIME_ZONE, "UTC");
 
         conf.setProperties(settings);
 
