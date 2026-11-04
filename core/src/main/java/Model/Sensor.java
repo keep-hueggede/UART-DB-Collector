@@ -54,6 +54,7 @@ public class Sensor {
         PRESSURE("hPa"),
         HUMIDITY("%"),
         WIND("m/s"),
+        WIND_DIRECTION("°"),
         RAIN("mm"),
         ALTITUDE("m"),
         VOLTAGE("V"),

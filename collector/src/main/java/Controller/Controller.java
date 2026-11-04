@@ -148,12 +148,13 @@ public class Controller implements IObserverListener {
 
         java.util.Map<Sensor.SensorType, Double> values = new java.util.HashMap<>();
         // "rain" is the amount since the node's previous report (mm), not a running total
-        String[] fields = {"temp", "pressure", "humidity", "wind", "rain", "altitude", "battery"};
+        String[] fields = {"temp", "pressure", "humidity", "wind", "winddir", "rain", "altitude", "battery"};
         Sensor.SensorType[] types = {
             Sensor.SensorType.TEMPERATURE,
             Sensor.SensorType.PRESSURE,
             Sensor.SensorType.HUMIDITY,
             Sensor.SensorType.WIND,
+            Sensor.SensorType.WIND_DIRECTION,
             Sensor.SensorType.RAIN,
             Sensor.SensorType.ALTITUDE,
             Sensor.SensorType.VOLTAGE

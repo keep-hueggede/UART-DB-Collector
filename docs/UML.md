@@ -85,6 +85,7 @@ classDiagram
         PRESSURE
         HUMIDITY
         WIND
+        WIND_DIRECTION
         RAIN
         ALTITUDE
         VOLTAGE
