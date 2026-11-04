@@ -11,6 +11,11 @@ import org.hibernate.cfg.Configuration;
 import org.hibernate.cfg.Environment;
 import org.hibernate.service.ServiceRegistry;
 
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.List;
 import java.util.Properties;
 import java.util.function.Function;
@@ -70,6 +75,27 @@ public class ORMapper extends CommonDbConnector {
                 .build();
         this.sessionFactory = this.conf.buildSessionFactory(reg);
         this.session = sessionFactory.openSession();
+        this.session.doWork(ORMapper::migrateSensorTypeColumn);
+    }
+
+    /**
+     * Older schemas hold Sensors.SensorType as a native ENUM, which rejects
+     * sensor types added later. Turn it into a VARCHAR once; values are kept.
+     */
+    static void migrateSensorTypeColumn(Connection c) throws SQLException {
+        DatabaseMetaData md = c.getMetaData();
+        for (String table : new String[]{"Sensors", "SENSORS"}) {
+            for (String column : new String[]{"SensorType", "SENSORTYPE"}) {
+                try (ResultSet r = md.getColumns(c.getCatalog(), null, table, column)) {
+                    if (r.next() && "ENUM".equalsIgnoreCase(r.getString("TYPE_NAME"))) {
+                        try (Statement st = c.createStatement()) {
+                            st.executeUpdate("ALTER TABLE " + table + " MODIFY " + column + " VARCHAR(32)");
+                        }
+                        return;
+                    }
+                }
+            }
+        }
     }
 
     public void disconnect() {

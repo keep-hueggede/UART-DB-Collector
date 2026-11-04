@@ -2,6 +2,8 @@ package Model;
 
 import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.util.ArrayList;
 import java.util.Date;
@@ -19,8 +21,10 @@ public class Sensor {
     @JoinColumn(name = "DeviceId", nullable = false)
     private Device device;
 
-    @Column(name = "SensorType")
+    // VARCHAR instead of a native MySQL ENUM, so new types need no schema change
+    @Column(name = "SensorType", length = 32)
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     private SensorType sensorType;
 
     @Column(name = "Name")
