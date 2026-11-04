@@ -58,6 +58,7 @@ const SENSOR_ICONS = {
   PRESSURE:    '<svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8zm.5-13.5V14l4.5 2.6-.8 1.4L11 15V6.5z" fill="currentColor"/></svg>',
   HUMIDITY:    '<svg viewBox="0 0 24 24"><path d="M12 2.7S5 10.1 5 14.6a7 7 0 0 0 14 0C19 10.1 12 2.7 12 2.7z" fill="currentColor"/></svg>',
   WIND:        '<svg viewBox="0 0 24 24"><path d="M3 8h10.2a3 3 0 1 0-2.8-4H3zm0 8h13.2a3 3 0 1 1-2.8 4H3zm0-4h7.2A3 3 0 1 1 7.4 16H3z" fill="currentColor"/></svg>',
+  WIND_DIRECTION: '<svg viewBox="0 0 24 24"><path d="M12 2 6.5 20 12 16.5 17.5 20z" fill="currentColor"/></svg>',
   RAIN:        '<svg viewBox="0 0 24 24"><path d="M17.5 11a4.5 4.5 0 0 0-8.6-1.7A3.5 3.5 0 0 0 6 16h11a3 3 0 0 0 .5-5zM8 18l-1 3m4-3-1 3m4-3-1 3" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>',
   ALTITUDE:    '<svg viewBox="0 0 24 24"><path d="M14 6 8.5 15H12l-2 5 7.5-10H14z" fill="currentColor"/><path d="M3 19h18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
   VOLTAGE:     '<svg viewBox="0 0 24 24"><path d="M13 2 4 14h6l-1 8 9-12h-6z" fill="currentColor"/></svg>',
@@ -71,12 +72,32 @@ function sensorIcon(type) {
 function sensorLabel(type) {
   const labels = {
     TEMPERATURE: "Temperatur", PRESSURE: "Luftdruck", HUMIDITY: "Luftfeuchte",
-    WIND: "Wind", RAIN: "Regen", ALTITUDE: "Höhe", VOLTAGE: "Spannung", CUSTOM: "Sensor",
+    WIND: "Wind", WIND_DIRECTION: "Windrichtung", RAIN: "Regen", ALTITUDE: "Höhe", VOLTAGE: "Spannung", CUSTOM: "Sensor",
   };
   return labels[type] || type || "Sensor";
 }
 
 /* -------------------------------------------------------------- helpers */
+
+const COMPASS = ["N", "NO", "O", "SO", "S", "SW", "W", "NW"];
+
+function compass(deg) {
+  const n = Number(deg);
+  if (deg === null || deg === undefined || Number.isNaN(n)) return "";
+  return COMPASS[Math.round((((n % 360) + 360) % 360) / 45) % 8];
+}
+
+// Mean of angles: averaging 350 and 10 must give 0, not 180
+function circularMean(points) {
+  if (!points || points.length === 0) return null;
+  let x = 0, y = 0;
+  for (const p of points) {
+    const r = Number(p.v) * Math.PI / 180;
+    x += Math.cos(r);
+    y += Math.sin(r);
+  }
+  return ((Math.atan2(y, x) * 180 / Math.PI) + 360) % 360;
+}
 
 function fmtValue(v, digits) {
   if (v === null || v === undefined) return "–";
@@ -434,7 +455,7 @@ function renderSensors(sensors, latest) {
         <span class="sensor-icon">${sensorIcon(s.sensorType)}</span>
         <span class="sensor-name" title="${escapeHtml(s.deviceName)}">${escapeHtml(s.deviceName)} · ${escapeHtml(sensorLabel(s.sensorType))}</span>
       </div>
-      <div class="sensor-value">${fmtValue(m.value)}<span class="unit">${escapeHtml(s.unit || "")}</span></div>
+      <div class="sensor-value">${fmtValue(m.value, s.sensorType === "WIND_DIRECTION" ? 0 : undefined)}<span class="unit">${escapeHtml(s.unit || "")}${s.sensorType === "WIND_DIRECTION" ? " " + compass(m.value) : ""}</span></div>
       <div class="sensor-spark-slot"></div>
       <div class="sensor-time">${m.timestamp ? fmtAge(m.timestamp) : "keine Daten"}</div>`;
     card.addEventListener("click", () => openDetail(s.id));
@@ -472,12 +493,15 @@ async function loadDetail() {
   const pts = data.points || [];
   const last = pts.length ? pts[pts.length - 1] : null;
   const isRain = data.sensor?.sensorType === "RAIN";
+  const isDir = data.sensor?.sensorType === "WIND_DIRECTION";
   $("detail-current").textContent = isRain ? fmtValue(data.stats?.sum ?? 0) : (last ? fmtValue(Number(last.v)) : "–");
-  $("detail-unit").textContent = isRain ? `${unit} im Zeitraum` : unit;
+  $("detail-unit").textContent = isRain ? `${unit} im Zeitraum` : isDir && last ? `${unit} ${compass(last.v)}` : unit;
   renderBigChart($("chart"), pts, unit);
   $("stat-min").textContent = fmtValue(data.stats?.min);
   $("stat-avg-label").textContent = isRain ? "Σ" : "Ø";
-  $("stat-avg").textContent = fmtValue(isRain ? data.stats?.sum : data.stats?.avg);
+  $("stat-avg").textContent = isDir
+    ? (pts.length ? `${fmtValue(circularMean(pts), 0)}° ${compass(circularMean(pts))}` : "–")
+    : fmtValue(isRain ? data.stats?.sum : data.stats?.avg);
   $("stat-max").textContent = fmtValue(data.stats?.max);
   $("stat-count").textContent = data.stats?.count ?? "–";
 }
