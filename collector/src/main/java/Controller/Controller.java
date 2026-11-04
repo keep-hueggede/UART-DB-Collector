@@ -194,6 +194,8 @@ public class Controller implements IObserverListener {
 
     @Override
     public void onSignaled(String answer) {
+        // over USB the receiver's debug console shares the line with the JSON data
+        if (!answer.startsWith("{")) return;
         if (answer.startsWith("{\"fw\"")) {
             if (this.firmware != null) this.firmware.onReply(answer);
             return;
