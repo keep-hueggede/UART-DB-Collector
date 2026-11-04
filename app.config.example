@@ -5,6 +5,8 @@
 #   uart-db-webserver.jar (Server): SERVER.*, GOOGLE.*, DB.* (nur MySQL, kein H2/SSH)
 
 # === UART (ESP-C6 ThreadReceiver -> Pi) - nur Collector ===
+# /dev/ttyACM0: C6 per USB am Pi (Strom + Daten, empfohlen)
+# /dev/serial0: C6 an den UART-Pins (Pi pin 8/10 + GND)
 UART.PORTNAME=/dev/serial0
 UART.BAUD=115200
 

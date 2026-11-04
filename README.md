@@ -26,7 +26,8 @@ Hibernate in einer H2-Datenbank oder in einer MySQL-Datenbank auf einem Server
 
 * Java 17 oder neuer
 * Maven (Build)
-* Serielle Schnittstelle zum Empfaenger (z.B. `/dev/serial0` auf dem Pi)
+* Serielle Schnittstelle zum Empfaenger: USB (`/dev/ttyACM0`, empfohlen) oder die
+  UART-Pins (`/dev/serial0`)
 * Optional: MySQL-Server + SSH-Zugang fuer die Remote-Datenbank
 
 ## Build & Start
