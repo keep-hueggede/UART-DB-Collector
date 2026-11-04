@@ -72,11 +72,16 @@ public class UARTCom extends Observer implements IListenerInterface {
 
                 @Override
                 public int getListeningEvents() {
-                    return SerialPort.LISTENING_EVENT_DATA_RECEIVED;
+                    return SerialPort.LISTENING_EVENT_DATA_RECEIVED | SerialPort.LISTENING_EVENT_PORT_DISCONNECTED;
                 }
 
                 @Override
                 public void serialEvent(SerialPortEvent event) {
+                    if (event.getEventType() == SerialPort.LISTENING_EVENT_PORT_DISCONNECTED) {
+                        // USB receiver unplugged or rebooted: the port is gone for good, systemd restarts us
+                        System.err.println("UART: " + portDescriptor + " getrennt - Collector wird beendet");
+                        System.exit(3);
+                    }
                     byte[] res = event.getReceivedData();
                     String msg = new String(res, StandardCharsets.UTF_8).trim();
                     if (!msg.isEmpty()) {
