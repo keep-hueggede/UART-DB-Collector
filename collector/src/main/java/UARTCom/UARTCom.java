@@ -80,7 +80,9 @@ public class UARTCom extends Observer implements IListenerInterface {
                     if (event.getEventType() == SerialPort.LISTENING_EVENT_PORT_DISCONNECTED) {
                         // USB receiver unplugged or rebooted: the port is gone for good, systemd restarts us
                         System.err.println("UART: " + portDescriptor + " getrennt - Collector wird beendet");
-                        System.exit(3);
+                        // exit from another thread: the shutdown hook closes the port and waits for this one
+                        new Thread(() -> System.exit(3), "uart-exit").start();
+                        return;
                     }
                     byte[] res = event.getReceivedData();
                     String msg = new String(res, StandardCharsets.UTF_8).trim();
