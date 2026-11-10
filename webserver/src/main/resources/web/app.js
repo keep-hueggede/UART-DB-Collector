@@ -525,7 +525,7 @@ $("range-tabs").addEventListener("click", e => {
 /* ---------------------------------------------------------------- admin */
 
 const reportError = err => { if (!err.isAuth) toast(err.message, true); };
-const ADMIN_TABS = { users: () => loadAdminUsers(), server: () => loadAdminSettings(), app: async () => loadAppSettings() };
+const ADMIN_TABS = { users: () => loadAdminUsers(), network: () => loadAdminNetwork(), server: () => loadAdminSettings(), app: async () => loadAppSettings() };
 
 $("btn-settings").addEventListener("click", () => {
   if (!isAdmin()) return; // the button is hidden for users; the API enforces it anyway
@@ -558,6 +558,73 @@ function showAdminTab(tab) {
     $("admin-" + name).classList.toggle("hidden", name !== tab);
   }
   ADMIN_TABS[tab]().catch(reportError);
+}
+
+/* ------------------------------------------------- network map (admin) */
+
+const NET_ICONS = {
+  server: '<svg viewBox="0 0 24 24"><path d="M6.5 19a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 17.6 9 4 4 0 0 1 17.5 19z" fill="currentColor"/></svg>',
+  collector: '<svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8 10h3v4H8zm5 0h3m-3 2h3m-3 2h3M9 3v3m6-3v3M9 18v3m6-3v3" stroke="currentColor" stroke-width="1.6" fill="none"/></svg>',
+  sensor: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.2" fill="currentColor"/><path d="M8.5 8.5a5 5 0 0 0 0 7m7-7a5 5 0 0 1 0 7M5.6 5.6a9 9 0 0 0 0 12.8m12.8-12.8a9 9 0 0 1 0 12.8" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>',
+};
+
+function netNode(kind, title, lines, version, state, online) {
+  const node = el("div", "net-node" + (online ? "" : " offline"));
+  node.innerHTML = `
+    <div class="net-icon">${NET_ICONS[kind]}<span class="net-dot${online ? " on" : ""}"></span></div>
+    <div class="net-title">${escapeHtml(title)}</div>
+    ${lines.map(l => `<div class="net-line">${escapeHtml(l)}</div>`).join("")}
+    <div class="net-version ${state}">${escapeHtml(version || "–")}</div>`;
+  return node;
+}
+
+function netItem(node, children) {
+  const li = el("li", "");
+  li.appendChild(node);
+  if (children && children.length) {
+    const ul = el("ul", "");
+    for (const c of children) ul.appendChild(c);
+    li.appendChild(ul);
+  }
+  return li;
+}
+
+function sensorState(fw, offered) {
+  if (!fw) return ["unknown", "–"];
+  if (fw === "dev") return ["warn", "dev (lokal)"];
+  if (offered && fw !== offered) return ["warn", `${fw} → ${offered}`];
+  return ["ok", fw];
+}
+
+function sensorNode(d, offered) {
+  const [state, label] = sensorState(d.firmware, offered);
+  const seen = d.lastSeen ? "zuletzt " + fmtTime(d.lastSeen, true) : "noch nie gemeldet";
+  return netNode("sensor", d.name, [d.name !== d.hardwareId ? d.hardwareId : "", seen].filter(Boolean),
+    label, state, d.online);
+}
+
+async function loadAdminNetwork() {
+  const net = await api("/api/admin/network");
+  const server = net.server;
+  const collectors = net.collectors.map(c => {
+    const state = c.version === server.version ? "ok" : "warn";
+    const lines = [c.online ? "online" : "offline seit " + fmtTime(c.lastSeen, true)];
+    if (c.sensorFirmware) lines.push("Empfänger: Sensor-FW " + c.sensorFirmware);
+    return netItem(netNode("collector", c.name, lines, c.version, state, c.online),
+      c.devices.map(d => netItem(sensorNode(d, c.sensorFirmware))));
+  });
+  if (net.unassigned.length) {
+    const node = netNode("collector", "Ohne Zuordnung", ["Sensoren vor der Netzwerk-Karte"], "", "unknown", false);
+    collectors.push(netItem(node, net.unassigned.map(d => netItem(sensorNode(d, null)))));
+  }
+  const root = netItem(netNode("server", "Web-Server", [location.host], server.version, "ok", true), collectors);
+  const tree = el("ul", "net-tree");
+  tree.appendChild(root);
+  const map = $("net-map");
+  map.replaceChildren(tree);
+  if (!net.collectors.length && !net.unassigned.length) {
+    map.appendChild(el("p", "hint", "Noch kein Collector gemeldet."));
+  }
 }
 
 async function loadAdminUsers() {

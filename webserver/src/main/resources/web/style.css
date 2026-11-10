@@ -692,3 +692,47 @@ dialog { max-height: 90dvh; overflow-y: auto; }
   .user-head { flex-wrap: wrap; }
   .user-head .small-btn { margin-left: auto; }
 }
+
+/* ------------------------------------------------------- network map */
+
+.net-map { overflow-x: auto; padding: 8px 0 16px; -webkit-overflow-scrolling: touch; }
+.net-tree, .net-tree ul { display: flex; justify-content: center; margin: 0; padding: 22px 0 0; position: relative; }
+.net-tree { padding-top: 0; min-width: max-content; margin: 0 auto; }
+.net-tree li { list-style: none; position: relative; padding: 22px 6px 0; display: flex; flex-direction: column; align-items: center; }
+.net-tree > li { padding-top: 0; }
+/* connector lines: horizontal bar above siblings, vertical drop into each node */
+.net-tree li::before, .net-tree li::after {
+  content: ""; position: absolute; top: 0; right: 50%; width: 50%; height: 22px;
+  border-top: 2px solid var(--border);
+}
+.net-tree li::after { right: auto; left: 50%; border-left: 2px solid var(--border); }
+.net-tree > li::before, .net-tree > li::after { display: none; }
+.net-tree li:first-child::before, .net-tree li:last-child::after { border: 0 none; }
+.net-tree li:last-child::before { border-right: 2px solid var(--border); border-radius: 0 8px 0 0; }
+.net-tree li:first-child::after { border-radius: 8px 0 0 0; }
+.net-tree li:only-child::before { display: none; }
+.net-tree li:only-child::after { border-top: 0; border-radius: 0; }
+.net-tree ul::before {
+  content: ""; position: absolute; top: 0; left: 50%; height: 22px; border-left: 2px solid var(--border);
+}
+
+.net-node {
+  width: 132px; padding: 10px 8px; border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--bg-card); text-align: center; font-size: 12px;
+}
+.net-node.offline { opacity: .6; }
+.net-icon { position: relative; width: 36px; height: 36px; margin: 0 auto 6px; color: var(--accent); }
+.net-icon svg { width: 36px; height: 36px; }
+.net-dot {
+  position: absolute; right: -2px; bottom: -2px; width: 10px; height: 10px; border-radius: 50%;
+  background: var(--text-muted); border: 2px solid var(--bg-card);
+}
+.net-dot.on { background: #3fb950; }
+.net-title { font-weight: 600; font-size: 13px; overflow-wrap: anywhere; }
+.net-line { color: var(--text-muted); overflow-wrap: anywhere; }
+.net-version {
+  display: inline-block; margin-top: 6px; padding: 2px 8px; border-radius: 999px;
+  font-weight: 600; background: var(--accent-soft); color: var(--accent);
+}
+.net-version.warn { background: rgba(210, 153, 34, .15); color: var(--warn); }
+.net-version.unknown { background: var(--bg-elevated); color: var(--text-muted); }

@@ -1,5 +1,5 @@
 // bump together with the ?v= of app.js/style.css in index.html
-const CACHE = "uart-db-v11";
+const CACHE = "uart-db-v12";
 const SHELL = [
   "./",
   "index.html",

@@ -102,6 +102,7 @@
       <h2 class="admin-title">Administration</h2>
       <div class="range-tabs admin-tabs" id="admin-tabs">
         <button data-tab="users" class="active">Benutzer</button>
+        <button data-tab="network">Netzwerk</button>
         <button data-tab="server">Server</button>
         <button data-tab="app">App</button>
       </div>
@@ -110,6 +111,11 @@
         <p class="hint">Benutzer sehen nur die Feldgeräte, die du ihnen zuweist.
           Administratoren sehen alles und können Geräte umbenennen, Korrekturwerte setzen und Einstellungen ändern.</p>
         <div id="admin-user-list" class="dev-list"></div>
+      </div>
+
+      <div id="admin-network" class="admin-tab hidden">
+        <p class="hint">Web-Server, Collectoren und die Sensoren, die zuletzt über sie gemeldet haben – jeweils mit Version.</p>
+        <div id="net-map" class="net-map"></div>
       </div>
 
       <form id="admin-server" class="admin-tab admin-panel hidden" autocomplete="off">
