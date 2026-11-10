@@ -64,6 +64,16 @@ public class Test_PayloadParsing {
     }
 
     @Test
+    public void windGust() throws Exception {
+        String line = "{\"src\":\"1051dbfffe60b875\",\"wind\":1.20,\"gust\":3.45,\"rain\":0.00,\"tips\":0}";
+        Controller.ParsedData p = Controller.parseLine(om.readTree(line));
+
+        assertEquals(1.20, p.values.get(Sensor.SensorType.WIND));
+        assertEquals(3.45, p.values.get(Sensor.SensorType.WIND_GUST));
+        assertEquals(3, p.values.size());
+    }
+
+    @Test
     public void firmwareVersionIsReadButNoMeasurement() throws Exception {
         String line = "{\"src\":\"1051dbfffe60b875\",\"temp\":23.4,\"fw\":\"1.2.0\"}";
         Controller.ParsedData p = Controller.parseLine(om.readTree(line));
