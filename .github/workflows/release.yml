@@ -25,7 +25,7 @@ jobs:
         cache: maven
 
     - name: Build and run unit tests
-      run: mvn -B verify --file pom.xml
+      run: mvn -B verify --file pom.xml -Dapp.version="${GITHUB_REF_NAME#v}"
 
     - name: Check jar manifests
       run: |

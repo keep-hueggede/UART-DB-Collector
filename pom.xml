@@ -20,6 +20,8 @@
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- set by the release build (-Dapp.version=1.6.0), shown in the network map -->
+        <app.version>dev</app.version>
     </properties>
 
     <dependencyManagement>
