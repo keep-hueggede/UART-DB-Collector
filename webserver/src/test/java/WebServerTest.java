@@ -428,7 +428,7 @@ public class WebServerTest {
                 .setParameter("c", piId).executeUpdate());
 
         JsonNode net = json.readTree(get("/api/admin/network", adminToken).body());
-        assertEquals("dev", net.get("server").get("version").asText());
+        assertEquals(ORMUtil.AppVersion.get(), net.get("server").get("version").asText());
         JsonNode c = net.get("collectors").get(0);
         assertEquals("pi-garten", c.get("name").asText());
         assertTrue(c.get("online").asBoolean());
