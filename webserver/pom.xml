@@ -21,6 +21,11 @@
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
         </dependency>
+        <!-- SMTP for admin notifications -->
+        <dependency>
+            <groupId>org.eclipse.angus</groupId>
+            <artifactId>angus-mail</artifactId>
+        </dependency>
         <!-- tests only: in production the web server uses MySQL, no H2 in the jar -->
         <dependency>
             <groupId>com.h2database</groupId>

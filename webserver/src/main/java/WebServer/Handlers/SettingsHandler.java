@@ -10,7 +10,7 @@ import java.io.IOException;
 /**
  * GET / PUT /api/admin/settings (admin) - settings stored in the database.
  * The Google client secret is write-only: GET only says whether it is set,
- * PUT without "googleClientSecret" keeps the stored one.
+ * PUT without "googleClientSecret" keeps the stored one; the same holds for "mailPassword".
  */
 public class SettingsHandler implements Handler {
 
@@ -37,6 +37,15 @@ public class SettingsHandler implements Handler {
             String secret = text(body, "googleClientSecret");
             settings.update(text(body, "googleClientId"), secret == null || secret.isBlank() ? null : secret,
                     text(body, "googleRedirectUri"), ttl == null || ttl.isNull() ? null : ttl.asInt());
+            JsonNode port = body.get("mailPort");
+            if (port != null && !port.isNull() && !port.canConvertToInt()) {
+                call.error(400, "mailPort must be a number");
+                return;
+            }
+            String password = text(body, "mailPassword");
+            settings.updateMail(text(body, "mailHost"), port == null || port.isNull() ? null : port.asInt(),
+                    text(body, "mailSecurity"), text(body, "mailUser"),
+                    password == null || password.isBlank() ? null : password, text(body, "mailFrom"));
         }
         call.json(200, settings.view());
     }

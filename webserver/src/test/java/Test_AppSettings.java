@@ -51,6 +51,53 @@ public class Test_AppSettings {
     }
 
     @Test
+    public void mailDefaultsToStrato() {
+        settings.apply();
+        Map<String, Object> view = settings.view();
+        assertEquals("smtp.strato.de", view.get("mailHost"));
+        assertEquals("SSL", view.get("mailSecurity"));
+        assertEquals(465, view.get("mailPort"));
+        assertEquals(false, view.get("mailConfigured"));
+    }
+
+    @Test
+    public void mailUserIsDefaultSenderAndPasswordStaysHidden() {
+        settings.updateMail(null, null, null, "wetter@example.de", "mail-secret", null);
+        Map<String, Object> view = settings.view();
+        assertEquals(true, view.get("mailConfigured"));
+        assertEquals(true, view.get("mailPasswordSet"));
+        assertFalse(view.toString().contains("mail-secret"));
+
+        settings.updateMail(null, 587, "starttls", null, null, null);   // null keeps the password
+        assertEquals(587, settings.view().get("mailPort"));
+        assertEquals("STARTTLS", settings.view().get("mailSecurity"));
+        assertEquals(true, settings.view().get("mailPasswordSet"));
+    }
+
+    @Test
+    public void rejectsInvalidMailValues() {
+        assertThrows(IllegalArgumentException.class, () -> settings.updateMail("smtp host", null, null, null, null, null));
+        assertThrows(IllegalArgumentException.class, () -> settings.updateMail(null, 70000, null, null, null, null));
+        assertThrows(IllegalArgumentException.class, () -> settings.updateMail(null, null, "TLS1", null, null, null));
+        assertThrows(IllegalArgumentException.class, () -> settings.updateMail(null, null, null, null, null, "no-address"));
+    }
+
+    @Test
+    public void importsMailValuesFromConfigOnce() {
+        Properties p = new Properties();
+        p.setProperty("MAIL.USER", "wetter@example.de");
+        p.setProperty("MAIL.PASSWORD", "from-config");
+        settings.importFromConfig(p);
+        settings.apply();
+        assertEquals(true, settings.view().get("mailConfigured"));
+        assertEquals("smtp.strato.de", settings.view().get("mailHost"));
+
+        settings.updateMail(null, null, null, "admin@example.de", null, null);
+        settings.importFromConfig(p);
+        assertEquals("admin@example.de", settings.view().get("mailUser"));
+    }
+
+    @Test
     public void secretIsNeverReturned() {
         settings.update("id", "top-secret", "", 7);
         Map<String, Object> view = settings.view();

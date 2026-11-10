@@ -2,7 +2,7 @@
 # Kopieren nach ./app.config und anpassen. Beide Jars lesen dieselbe Datei
 # und ignorieren fremde Schluessel:
 #   uart-db-collector.jar (Pi):    UART.*, BUFFER.*, DB.*, SSH.*
-#   uart-db-webserver.jar (Server): SERVER.*, GOOGLE.*, DB.* (nur MySQL, kein H2/SSH)
+#   uart-db-webserver.jar (Server): SERVER.*, GOOGLE.*, MAIL.*, DB.* (nur MySQL, kein H2/SSH)
 
 # === UART (ESP-C6 ThreadReceiver -> Pi) - nur Collector ===
 # /dev/ttyACM0: C6 per USB am Pi (Strom + Daten, empfohlen)
@@ -45,6 +45,18 @@ SERVER.SECURE_COOKIE=false
 # gespeichert (spaeter: Zahnrad -> Administration -> Server). Hier nicht mehr noetig;
 # vorhandene GOOGLE.CLIENT_ID / GOOGLE.CLIENT_SECRET / GOOGLE.REDIRECT_URI
 # werden beim ersten Start einmalig in die Datenbank uebernommen.
+
+# === E-Mail an alle Admins bei neuen Konten - nur Webserver ===
+# Wie GOOGLE.*: wird beim ersten Start einmalig in die Datenbank uebernommen
+# (spaeter: Administration -> Server). Ohne MAIL.USER keine Mails.
+# Voreinstellung Strato; Benutzer = volle E-Mail-Adresse.
+#MAIL.HOST=smtp.strato.de
+#MAIL.SECURITY=SSL
+#MAIL.PORT=465
+#MAIL.USER=wetter@example.de
+#MAIL.PASSWORD=
+# leer = MAIL.USER
+#MAIL.FROM=
 
 # === Sensor-Firmware-Updates - nur Collector (Pi) ===
 # Neue GitHub-Releases der Sensor-Firmware werden geladen, per SHA-256
