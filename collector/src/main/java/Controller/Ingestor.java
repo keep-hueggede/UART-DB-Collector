@@ -1,5 +1,6 @@
 package Controller;
 
+import Model.Collector;
 import Model.Device;
 import Model.Measurement;
 import Model.Sensor;
@@ -11,6 +12,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 
 /**
  * Stores UART lines in the database. While the database is unreachable, lines go
@@ -27,6 +29,12 @@ public final class Ingestor {
     private final ObjectMapper json = new ObjectMapper();
     private boolean healthy;
 
+    /** How this collector shows up in the network map. */
+    public record Identity(String name, String version, String uartPort, Date startedAt, Supplier<String> receiverFirmware) {}
+
+    private Identity identity;
+    private Integer collectorId;   // id of this collector's row, once registered
+
     /**
      * @param reconnect restores the database connection (tunnel + pool), true on success
      * @param healthy   whether the database was reachable at start-up
@@ -36,6 +44,37 @@ public final class Ingestor {
         this.spool = spool;
         this.reconnect = reconnect;
         this.healthy = healthy;
+    }
+
+    public void identify(Identity identity) {
+        this.identity = identity;
+    }
+
+    /** Registers this collector or refreshes its row (version, receiver firmware, last seen). */
+    public void heartbeat() {
+        if (identity == null || !healthy) return;
+        try {
+            Collector c = mapper.findByName(Collector.class, identity.name());
+            boolean created = c == null;
+            if (created) c = new Collector(identity.name());
+            c.setVersion(identity.version());
+            c.setUartPort(identity.uartPort());
+            c.setStartedAt(identity.startedAt());
+            String fw = identity.receiverFirmware().get();
+            if (fw != null) c.setSensorFirmware(fw);
+            c.setLastSeen(new Date());
+            if (created) mapper.persist(c);
+            else mapper.merge(c);
+            collectorId = c.getId();
+        } catch (RuntimeException ex) {
+            System.err.println("Netzwerk: Collector-Eintrag fehlgeschlagen: " + ex.getMessage());
+        } finally {
+            try {
+                mapper.clear();
+            } catch (RuntimeException ignored) {
+                // no session while disconnected
+            }
+        }
     }
 
     public boolean isHealthy() {
@@ -173,6 +212,7 @@ public final class Ingestor {
         if (device.getLastSeen() == null || at.after(device.getLastSeen())) {
             device.setLastSeen(at);
             if (firmware != null && firmware.length() <= 32) device.setFirmware(firmware);
+            if (collectorId != null) device.setCollectorId(collectorId);
         }
         mapper.merge(device);
         return device;

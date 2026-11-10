@@ -4,6 +4,9 @@
 #   uart-db-collector.jar (Pi):    UART.*, BUFFER.*, DB.*, SSH.*
 #   uart-db-webserver.jar (Server): SERVER.*, GOOGLE.*, MAIL.*, DB.* (nur MySQL, kein H2/SSH)
 
+# === Name in der Netzwerk-Karte - nur Collector (leer = Hostname) ===
+COLLECTOR.NAME=
+
 # === UART (ESP-C6 ThreadReceiver -> Pi) - nur Collector ===
 # /dev/ttyACM0: C6 per USB am Pi (Strom + Daten, empfohlen)
 # /dev/serial0: C6 an den UART-Pins (Pi pin 8/10 + GND)

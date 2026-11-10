@@ -41,6 +41,10 @@ public class Device {
     @Column(name = "Firmware", length = 32)
     private String firmware;
 
+    // Collector that received the device's last report (network map)
+    @Column(name = "CollectorId")
+    private Integer collectorId;
+
     @OneToMany(mappedBy = "device", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Sensor> sensors = new ArrayList<>();
 
@@ -78,6 +82,8 @@ public class Device {
     public void setLastSeen(Date lastSeen) { this.lastSeen = lastSeen; }
     public String getFirmware() { return firmware; }
     public void setFirmware(String firmware) { this.firmware = firmware; }
+    public Integer getCollectorId() { return collectorId; }
+    public void setCollectorId(Integer collectorId) { this.collectorId = collectorId; }
     public List<Sensor> getSensors() { return sensors; }
     public List<Actuator> getActuators() { return actuators; }
     public Date getCreatedAt() { return createdAt; }

@@ -98,7 +98,8 @@ public class Test_DatabaseSetup {
     public void entityListContainsAllTables() {
         assertTrue(DatabaseSetup.ENTITIES.contains(UserAccount.class));
         assertTrue(DatabaseSetup.ENTITIES.contains(Model.Setting.class));
-        assertEquals(7, DatabaseSetup.ENTITIES.size());
+        assertTrue(DatabaseSetup.ENTITIES.contains(Model.Collector.class));
+        assertEquals(8, DatabaseSetup.ENTITIES.size());
     }
 
     @Test

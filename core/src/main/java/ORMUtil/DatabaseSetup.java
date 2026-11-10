@@ -1,6 +1,7 @@
 package ORMUtil;
 
 import Model.Actuator;
+import Model.Collector;
 import Model.Device;
 import Model.Measurement;
 import Model.Sensor;
@@ -25,7 +26,7 @@ public final class DatabaseSetup {
 
     // Every module registers all entities so both sides keep the same schema
     public static final List<Class> ENTITIES = List.of(Device.class, Sensor.class, Measurement.class,
-            Actuator.class, UserAccount.class, UserDevice.class, Setting.class);
+            Actuator.class, UserAccount.class, UserDevice.class, Setting.class, Collector.class);
 
     /** Local port forwarding to the database (implemented by the collector's SSH tunnel). */
     public interface Tunnel {

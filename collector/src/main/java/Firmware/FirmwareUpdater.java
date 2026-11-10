@@ -53,6 +53,8 @@ public class FirmwareUpdater {
             .build();
     private final ObjectMapper json = new ObjectMapper();
     private final BlockingQueue<JsonNode> replies = new LinkedBlockingQueue<>();
+    // sensor firmware the receiver holds, as last reported (null = unknown)
+    private volatile String receiverFirmware;
 
     public FirmwareUpdater(Properties p, Link link) {
         this.link = link;
@@ -62,6 +64,10 @@ public class FirmwareUpdater {
         this.downloadUrl = p.getProperty("FIRMWARE.DOWNLOAD_URL", "https://github.com").trim();
         this.dir = Path.of(p.getProperty("FIRMWARE.DIR", "./firmware").trim());
         this.replyTimeoutMs = Long.parseLong(p.getProperty("FIRMWARE.REPLY_TIMEOUT_MS", "5000").trim());
+    }
+
+    public String receiverFirmware() {
+        return receiverFirmware;
     }
 
     public static boolean enabled(Properties p) {
@@ -91,6 +97,8 @@ public class FirmwareUpdater {
 
         JsonNode status = command("FW STATUS", "status", replyTimeoutMs);
         if (status == null) return Result.RECEIVER_UNAVAILABLE;
+        String held = status.path("version").asText("");
+        receiverFirmware = held.isEmpty() ? null : held;
         if (release.version.equals(status.path("version").asText()) && sha.equals(status.path("sha256").asText())) {
             return Result.UP_TO_DATE;
         }
@@ -115,6 +123,7 @@ public class FirmwareUpdater {
             }
         }
         expect(command("FW END", "stored", END_TIMEOUT_MS), "END");
+        receiverFirmware = release.version;
         System.out.printf("Firmware: %s auf dem Empfaenger gespeichert (%d s), wird den Sensoren angeboten%n",
                 release.version, (System.currentTimeMillis() - started) / 1000);
         return Result.UPLOADED;

@@ -34,6 +34,7 @@ public class Test_Ingestor {
         mapper.executeHQL("DELETE FROM Measurement");
         mapper.executeHQL("DELETE FROM Sensor");
         mapper.executeHQL("DELETE FROM Device");
+        mapper.executeHQL("DELETE FROM Collector");
         tmp = Files.createTempDirectory("spool");
         spool = new Spool(tmp.resolve("pending.log"));
         ingestor = new Ingestor(mapper, spool, this::reconnect, true);
@@ -62,6 +63,25 @@ public class Test_Ingestor {
         assertEquals(2, ms.size());
         assertEquals(T_A, ms.get(0).getTimestamp().getTime());
         assertTrue(spool.isEmpty());
+    }
+
+    @Test
+    public void heartbeatRegistersCollectorAndLinksDevices() {
+        String[] receiverFw = {null};
+        ingestor.identify(new Ingestor.Identity("pi-garten", "1.6.0", "/dev/c6", new java.util.Date(T_A),
+                () -> receiverFw[0]));
+        ingestor.heartbeat();
+        receiverFw[0] = "1.2.0";
+        ingestor.heartbeat();   // second beat updates the same row
+
+        List<Model.Collector> all = mapper.getAll(Model.Collector.class);
+        assertEquals(1, all.size());
+        assertEquals("1.6.0", all.get(0).getVersion());
+        assertEquals("1.2.0", all.get(0).getSensorFirmware());
+
+        ingestor.ingest(LINE_A, T_A);
+        Device d = mapper.findByHardwareId(Device.class, "1051dbfffe60b875");
+        assertEquals(Integer.valueOf(all.get(0).getId()), d.getCollectorId());
     }
 
     @Test

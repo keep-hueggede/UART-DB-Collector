@@ -2,6 +2,7 @@ package Controller;
 
 import Firmware.FirmwareUpdater;
 import Model.Sensor;
+import ORMUtil.AppVersion;
 import Listener.IObserverListener;
 import ORMUtil.DatabaseSetup;
 import ORMUtil.ORMapper;
@@ -19,6 +20,8 @@ public class Controller implements IObserverListener {
 
     private static final int RETRY_S = 30;
     private static final int LOG_EVERY_N_FAILURES = 20;   // ~10 min at RETRY_S
+    private static final long HEARTBEAT_MS = 2 * 60 * 1000;
+    private long lastHeartbeat = 0;
 
     private UARTCom com;
     private DatabaseSetup db;
@@ -53,6 +56,8 @@ public class Controller implements IObserverListener {
             this.com = new UARTCom(uartPort, uartBaud);
             this.com.open();
             this.com.addListener(this);
+            this.ingestor.identify(new Ingestor.Identity(collectorName(prop), AppVersion.get(), uartPort, new Date(),
+                    () -> this.firmware == null ? null : this.firmware.receiverFirmware()));
 
             System.out.println("UART-DB-Collector gestartet.");
             System.out.println("UART: " + uartPort + " @ " + uartBaud + " baud");
@@ -95,6 +100,19 @@ public class Controller implements IObserverListener {
         System.out.println("UART-DB-Collector beendet.");
     }
 
+    // COLLECTOR.NAME, else the host name
+    private static String collectorName(Properties prop) {
+        String name = prop.getProperty("COLLECTOR.NAME", "").trim();
+        if (name.isEmpty()) {
+            try {
+                name = java.net.InetAddress.getLocalHost().getHostName();
+            } catch (java.io.IOException ex) {
+                name = "collector";
+            }
+        }
+        return name.length() > 64 ? name.substring(0, 64) : name;
+    }
+
     private boolean tryConnect() {
         try {
             this.db.connect();
@@ -130,6 +148,10 @@ public class Controller implements IObserverListener {
         try {
             if (this.db.tunnelLost()) this.ingestor.markUnhealthy();
             this.ingestor.drain();
+            if (System.currentTimeMillis() - this.lastHeartbeat >= HEARTBEAT_MS) {
+                this.ingestor.heartbeat();
+                this.lastHeartbeat = System.currentTimeMillis();
+            }
         } catch (RuntimeException ex) {
             System.err.println("Puffer: Fehler beim Nachtragen: " + ex.getMessage());
         }
