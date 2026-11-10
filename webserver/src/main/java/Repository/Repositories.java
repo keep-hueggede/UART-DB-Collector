@@ -8,10 +8,12 @@ import ORMUtil.ORMapper;
  * collector's long-lived session, and is scoped to the requesting user.
  */
 public record Repositories(UserRepository users, DeviceRepository devices, SensorRepository sensors,
-                           MeasurementRepository measurements, SettingsRepository settings) {
+                           MeasurementRepository measurements, SettingsRepository settings,
+                           NetworkRepository network) {
 
     public static Repositories of(ORMapper mapper) {
         return new Repositories(new UserRepository(mapper), new DeviceRepository(mapper),
-                new SensorRepository(mapper), new MeasurementRepository(mapper), new SettingsRepository(mapper));
+                new SensorRepository(mapper), new MeasurementRepository(mapper), new SettingsRepository(mapper),
+                new NetworkRepository(mapper));
     }
 }

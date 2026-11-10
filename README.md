@@ -268,6 +268,17 @@ ohne Admin die Einrichtung erneut.
 Neue Google-Konten werden beim ersten Login als Benutzer ohne Geraete angelegt.
 Rollenaenderungen gelten sofort, auch fuer bestehende Sitzungen.
 
+### Netzwerk-Karte
+
+*Administration -> Netzwerk* zeigt den Aufbau wie das Mesh-Bild einer FRITZ!Box:
+oben der Web-Server, darunter jeder Collector, darunter die Sensoren, die
+zuletzt ueber ihn gemeldet haben - jeweils mit Version und Online-Status.
+Gelb markiert sind Sensoren, deren Firmware nicht der vom Empfaenger
+angebotenen entspricht (Update ausstehend), und Collectoren mit anderer
+Version als der Web-Server. Jeder Collector meldet sich alle 2 Minuten in der
+Tabelle `Collectors`; sein Name ist `COLLECTOR.NAME` aus `app.config`, sonst
+der Hostname.
+
 ### Benachrichtigungen per E-Mail
 
 Meldet sich ein Google-Konto zum ersten Mal an, erhalten **alle Administratoren**
@@ -341,6 +352,7 @@ Login-Flow selbst.
 | `PUT /api/admin/users/{id}/role` | Admin | `{"role":"ADMIN"\|"USER"}`; 409 fuer den letzten Admin |
 | `PUT /api/admin/users/{id}/devices/{deviceId}` | Admin | Device zuweisen |
 | `DELETE /api/admin/users/{id}/devices/{deviceId}` | Admin | Zuweisung entfernen |
+| `GET /api/admin/network` | Admin | Netzwerk-Karte: Web-Server-Version, Collectoren (Version, Sensor-Firmware des Empfaengers, online) und ihre Sensoren (Firmware, zuletzt gesehen) |
 | `GET /api/admin/settings` | Admin | Google-Client (ohne Schluessel), Sitzungsdauer, SMTP (ohne Passwort) |
 | `PUT /api/admin/settings` | Admin | `googleClientId`, `googleClientSecret` (leer = unveraendert), `googleRedirectUri`, `sessionTtlDays` (1-365), `mailHost`, `mailPort` (0 = Standard), `mailSecurity` (`SSL`\|`STARTTLS`\|`NONE`), `mailUser`, `mailPassword` (leer = unveraendert), `mailFrom` |
 | `POST /api/admin/settings/test-mail` | Admin | Testmail an das eigene Konto; 409 nicht eingerichtet, 502 mit SMTP-Fehler |

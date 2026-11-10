@@ -71,6 +71,7 @@ public class WebServer {
                 .admin("PUT", "/api/admin/users/{id}/role", new SetRoleHandler(repos))
                 .admin("PUT", "/api/admin/users/{id}/devices/{deviceId}", new AssignDeviceHandler(repos))
                 .admin("DELETE", "/api/admin/users/{id}/devices/{deviceId}", new AssignDeviceHandler(repos))
+                .admin("GET", "/api/admin/network", new NetworkHandler(repos))
                 .admin("GET", "/api/admin/settings", new SettingsHandler(settings))
                 .admin("PUT", "/api/admin/settings", new SettingsHandler(settings))
                 .admin("POST", "/api/admin/settings/test-mail", new TestMailHandler(settings));

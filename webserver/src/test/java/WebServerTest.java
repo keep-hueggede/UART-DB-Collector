@@ -86,6 +86,7 @@ public class WebServerTest {
         session.createQuery("DELETE FROM Measurement").executeUpdate();
         session.createQuery("DELETE FROM Sensor").executeUpdate();
         session.createQuery("DELETE FROM Device").executeUpdate();
+        session.createQuery("DELETE FROM Collector").executeUpdate();
         session.createQuery("DELETE FROM UserAccount").executeUpdate();
         session.createQuery("DELETE FROM Setting").executeUpdate();
         session.getTransaction().commit();
@@ -415,10 +416,33 @@ public class WebServerTest {
     }
 
     @Test
+    public void networkMapGroupsDevicesByCollector() throws Exception {
+        Model.Collector pi = new Model.Collector("pi-garten");
+        pi.setVersion("1.6.0");
+        pi.setSensorFirmware("1.2.0");
+        pi.setLastSeen(new java.util.Date());
+        this.mapper.persist(pi);
+        int piId = pi.getId();
+        this.mapper.writeInSession(s -> s.createMutationQuery(
+                        "UPDATE Device d SET d.collectorId = :c, d.firmware = '1.1.0' WHERE d.name = 'wetter1'")
+                .setParameter("c", piId).executeUpdate());
+
+        JsonNode net = json.readTree(get("/api/admin/network", adminToken).body());
+        assertEquals("dev", net.get("server").get("version").asText());
+        JsonNode c = net.get("collectors").get(0);
+        assertEquals("pi-garten", c.get("name").asText());
+        assertTrue(c.get("online").asBoolean());
+        assertEquals("1.2.0", c.get("sensorFirmware").asText());
+        assertEquals(1, c.get("devices").size());
+        assertEquals("1.1.0", c.get("devices").get(0).get("firmware").asText());
+        assertEquals(2, net.get("unassigned").size());
+    }
+
+    @Test
     public void adminEndpointsAreForbiddenForUsers() throws Exception {
         String ct = "application/json";
         int dave = userId("dave@test.example");
-        for (String path : List.of("/api/admin/users", "/api/admin/settings")) {
+        for (String path : List.of("/api/admin/users", "/api/admin/settings", "/api/admin/network")) {
             assertEquals(403, get(path, aliceToken).statusCode(), path);
             assertEquals(401, get(path, null).statusCode(), path);
         }
