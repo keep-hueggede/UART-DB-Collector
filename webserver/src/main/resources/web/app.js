@@ -634,7 +634,23 @@ async function loadAdminSettings() {
   $("adm-client-secret").placeholder = s.googleClientSecretSet ? "gespeichert – leer = unverändert" : "noch nicht gesetzt";
   $("adm-redirect").value = s.googleRedirectUri || "";
   $("adm-ttl").value = s.sessionTtlDays;
+  $("adm-mail-host").value = s.mailHost || "";
+  $("adm-mail-security").value = s.mailSecurity || "SSL";
+  $("adm-mail-port").value = s.mailPort;
+  $("adm-mail-user").value = s.mailUser || "";
+  $("adm-mail-password").value = "";
+  $("adm-mail-password").placeholder = s.mailPasswordSet ? "gespeichert – leer = unverändert" : "noch nicht gesetzt";
+  $("adm-mail-from").value = s.mailFrom || "";
 }
+
+$("btn-test-mail").addEventListener("click", async () => {
+  try {
+    const r = await api("/api/admin/settings/test-mail", { method: "POST", body: "{}" });
+    toast("Testmail an " + r.to + " gesendet");
+  } catch (err) {
+    reportError(err);
+  }
+});
 
 $("admin-server").addEventListener("submit", async e => {
   e.preventDefault();
@@ -642,9 +658,16 @@ $("admin-server").addEventListener("submit", async e => {
     googleClientId: $("adm-client-id").value.trim(),
     googleRedirectUri: $("adm-redirect").value.trim(),
     sessionTtlDays: parseInt($("adm-ttl").value, 10),
+    mailHost: $("adm-mail-host").value.trim(),
+    mailSecurity: $("adm-mail-security").value,
+    mailPort: parseInt($("adm-mail-port").value || "0", 10),
+    mailUser: $("adm-mail-user").value.trim(),
+    mailFrom: $("adm-mail-from").value.trim(),
   };
   const secret = $("adm-client-secret").value.trim();
   if (secret) body.googleClientSecret = secret;
+  const mailPassword = $("adm-mail-password").value;
+  if (mailPassword) body.mailPassword = mailPassword;
   try {
     await api("/api/admin/settings", { method: "PUT", body: JSON.stringify(body) });
     toast("Einstellungen gespeichert");

@@ -524,6 +524,19 @@ main.faded { display: none; }
   cursor: pointer;
 }
 
+.secondary-btn {
+  flex: none;
+  padding: 11px 16px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 .row { display: flex; gap: 8px; }
 .row input { flex: 1; min-width: 0; }
 
@@ -597,7 +610,7 @@ body:not(.is-admin) .admin-only { display: none !important; }
 }
 .admin-panel .hint { font-size: 12px; color: var(--text-muted); margin: 8px 0 0; line-height: 1.5; }
 .admin-panel code { background: var(--bg-elevated); padding: 1px 5px; border-radius: 5px; }
-.panel-actions { display: flex; justify-content: flex-end; margin-top: 16px; }
+.panel-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
 .user-row .hint { font-size: 12px; color: var(--text-muted); margin: 8px 0 0; }
 .user-row { flex-direction: column; align-items: stretch; }
 .user-head { display: flex; align-items: center; gap: 10px; }

@@ -126,7 +126,27 @@
         <h3>Sitzungen</h3>
         <label for="adm-ttl">Anmeldung gültig (Tage)</label>
         <input id="adm-ttl" type="number" min="1" max="365" step="1" required>
+        <h3>Benachrichtigungen per E-Mail</h3>
+        <p class="hint">Meldet sich ein neues Konto an, erhalten alle Administratoren eine E-Mail.
+          Voreingestellt ist Strato (<code>smtp.strato.de</code>, SSL, Port 465); Benutzer ist die volle E-Mail-Adresse.</p>
+        <label for="adm-mail-host">SMTP-Server</label>
+        <input id="adm-mail-host" type="text" spellcheck="false">
+        <label for="adm-mail-security">Verschlüsselung</label>
+        <select id="adm-mail-security">
+          <option value="SSL">SSL/TLS</option>
+          <option value="STARTTLS">STARTTLS</option>
+          <option value="NONE">keine</option>
+        </select>
+        <label for="adm-mail-port">Port</label>
+        <input id="adm-mail-port" type="number" min="0" max="65535" step="1" placeholder="0 = Standard">
+        <label for="adm-mail-user">Benutzer</label>
+        <input id="adm-mail-user" type="text" spellcheck="false" autocomplete="off" placeholder="name@example.de">
+        <label for="adm-mail-password">Passwort</label>
+        <input id="adm-mail-password" type="password" spellcheck="false" autocomplete="new-password">
+        <label for="adm-mail-from">Absender</label>
+        <input id="adm-mail-from" type="text" spellcheck="false" placeholder="leer = Benutzer">
         <div class="panel-actions">
+          <button type="button" id="btn-test-mail" class="secondary-btn">Testmail an mich</button>
           <button type="submit" class="primary-btn">Speichern</button>
         </div>
       </form>
