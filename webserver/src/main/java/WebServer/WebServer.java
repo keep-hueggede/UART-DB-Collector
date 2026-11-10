@@ -72,12 +72,14 @@ public class WebServer {
                 .admin("PUT", "/api/admin/users/{id}/devices/{deviceId}", new AssignDeviceHandler(repos))
                 .admin("DELETE", "/api/admin/users/{id}/devices/{deviceId}", new AssignDeviceHandler(repos))
                 .admin("GET", "/api/admin/settings", new SettingsHandler(settings))
-                .admin("PUT", "/api/admin/settings", new SettingsHandler(settings));
+                .admin("PUT", "/api/admin/settings", new SettingsHandler(settings))
+                .admin("POST", "/api/admin/settings/test-mail", new TestMailHandler(settings));
 
         OAuthStateStore states = new OAuthStateStore();
+        AdminNotifier notifier = new AdminNotifier(repos.users(), settings::mailer);
         this.auth = new Router()
                 .get("/auth/login", new LoginHandler(google, states, secureCookie))
-                .get("/auth/callback", new CallbackHandler(google, states, repos, sessions, setup, secureCookie))
+                .get("/auth/callback", new CallbackHandler(google, states, repos, sessions, setup, notifier, secureCookie))
                 .post("/auth/logout", new LogoutHandler(sessions, secureCookie));
 
         this.staticFiles = new StaticFileHandler(webRoot);

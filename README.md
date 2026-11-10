@@ -262,10 +262,25 @@ ohne Admin die Einrichtung erneut.
 | Geraete umbenennen, Korrekturwerte | – | ja |
 | Benutzer freigeben, Geraete zuweisen | – | ja |
 | Andere zu Administratoren machen | – | ja (der letzte Admin kann nicht entzogen werden) |
-| Google-Login, Sitzungsdauer aendern | – | ja (*Administration -> Server*) |
+| Google-Login, Sitzungsdauer, E-Mail-Versand aendern | – | ja (*Administration -> Server*) |
+| E-Mail bei neuen Konten | – | ja (alle Admins) |
 
 Neue Google-Konten werden beim ersten Login als Benutzer ohne Geraete angelegt.
 Rollenaenderungen gelten sofort, auch fuer bestehende Sitzungen.
+
+### Benachrichtigungen per E-Mail
+
+Meldet sich ein Google-Konto zum ersten Mal an, erhalten **alle Administratoren**
+eine E-Mail mit Name, Adresse und Zeitpunkt; die Freigabe erfolgt dann unter
+*Administration -> Benutzer*. Der Versand laeuft im Hintergrund, ein Fehler
+blockiert den Login nicht und steht nur im Server-Log.
+
+SMTP wird unter *Administration -> Server* eingetragen (oder einmalig per
+`MAIL.*` in `app.config`). Voreingestellt ist **Strato**: `smtp.strato.de`,
+SSL, Port 465; Benutzer ist die volle E-Mail-Adresse, Absender standardmaessig
+derselbe. Mit *Testmail an mich* laesst sich die Einstellung pruefen. Das
+Passwort liegt wie der Google-Clientschluessel in der Datenbank und wird nie
+ausgeliefert.
 
 ### Google-Login
 
@@ -284,7 +299,8 @@ einem Reverse-Proxy mit `X-Forwarded-Proto`). Die PWA merkt sich die Sitzung
 * Ersteinrichtung: Code nur in einer Datei auf dem Server, nie per HTTP;
   Vergleich in konstanter Zeit, nach 10 Fehlversuchen neuer Code. Der
   Nachweis wird per kurzlebigem `HttpOnly`-Cookie an den Google-Login gebunden.
-* Der Google-Clientschluessel wird nie ausgeliefert, auch nicht an Admins.
+* Der Google-Clientschluessel und das SMTP-Passwort werden nie ausgeliefert,
+  auch nicht an Admins.
 * Sessions: 256-Bit-Token (SecureRandom), nur dessen SHA-256-Hash liegt
   serverseitig; Cookie `HttpOnly` + `SameSite=Lax`, 30 Tage gueltig, per
   Logout sofort widerrufen. Native Apps nutzen stattdessen `Authorization:
@@ -325,8 +341,9 @@ Login-Flow selbst.
 | `PUT /api/admin/users/{id}/role` | Admin | `{"role":"ADMIN"\|"USER"}`; 409 fuer den letzten Admin |
 | `PUT /api/admin/users/{id}/devices/{deviceId}` | Admin | Device zuweisen |
 | `DELETE /api/admin/users/{id}/devices/{deviceId}` | Admin | Zuweisung entfernen |
-| `GET /api/admin/settings` | Admin | Google-Client (ohne Schluessel) und Sitzungsdauer |
-| `PUT /api/admin/settings` | Admin | `googleClientId`, `googleClientSecret` (leer = unveraendert), `googleRedirectUri`, `sessionTtlDays` (1-365) |
+| `GET /api/admin/settings` | Admin | Google-Client (ohne Schluessel), Sitzungsdauer, SMTP (ohne Passwort) |
+| `PUT /api/admin/settings` | Admin | `googleClientId`, `googleClientSecret` (leer = unveraendert), `googleRedirectUri`, `sessionTtlDays` (1-365), `mailHost`, `mailPort` (0 = Standard), `mailSecurity` (`SSL`\|`STARTTLS`\|`NONE`), `mailUser`, `mailPassword` (leer = unveraendert), `mailFrom` |
+| `POST /api/admin/settings/test-mail` | Admin | Testmail an das eigene Konto; 409 nicht eingerichtet, 502 mit SMTP-Fehler |
 
 ## Native App (spaeter)
 

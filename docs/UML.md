@@ -351,6 +351,7 @@ classDiagram
     }
     class UserRepository {
         +loginOrCreate(sub, email, name, picture) UserAccount
+        +adminEmails() List~String~
     }
     class DeviceRepository {
         +listLinked(int userId) List

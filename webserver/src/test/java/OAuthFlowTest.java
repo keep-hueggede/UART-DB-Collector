@@ -3,6 +3,7 @@ import ORMUtil.ORMapper;
 import Repository.Repositories;
 import WebServer.AppSettings;
 import WebServer.GoogleAuth;
+import WebServer.Mailer;
 import WebServer.SessionManager;
 import WebServer.SetupService;
 import WebServer.WebServer;
@@ -21,6 +22,8 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Base64;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -48,6 +51,9 @@ public class OAuthFlowTest {
     private String userEmail;
     private boolean emailVerified;
 
+    // mails the server would have sent: recipients + subject
+    private final List<String> sentMails = new CopyOnWriteArrayList<>();
+
     private final HttpClient http = HttpClient.newHttpClient();
     private final ObjectMapper json = new ObjectMapper();
 
@@ -69,6 +75,10 @@ public class OAuthFlowTest {
         Repositories repos = Repositories.of(mapper);
         AppSettings settings = new AppSettings(repos.settings(), google, sessions);
         settings.apply();
+        settings.useMailer(new Mailer() {
+            public boolean isConfigured() { return true; }
+            public void send(List<String> to, String subject, String text) { sentMails.add(to + " " + subject); }
+        });
         setup = new SetupService(repos.users(), Files.createTempDirectory("oauth"));
         setup.init();
         server = new WebServer(repos, sessions, google, settings, setup, "127.0.0.1", 0, "./does-not-exist", false);
@@ -242,6 +252,26 @@ public class OAuthFlowTest {
         assertEquals("first@test.example",
                 me(send("GET", "/auth/callback?code=c&state=" + state, cookie, null)).get("email").asText());
         assertFailed(send("GET", "/auth/callback?code=c&state=" + state, cookie, null));      // replay
+    }
+
+    @Test
+    public void newAccountsAreReportedToEveryAdmin() throws Exception {
+        String claim = claimSetup();
+        me(login(SetupService.CLAIM_COOKIE + "=" + claim));      // first admin: nobody to tell
+
+        stubAnswers("sub-2", "second@test.example");
+        me(login(null));
+        waitForMails(1);
+        assertEquals("[first@test.example] Neuer Benutzer: Test", sentMails.get(0));
+
+        me(login(null));                                          // known account: no mail
+        Thread.sleep(300);
+        assertEquals(1, sentMails.size());
+    }
+
+    private void waitForMails(int n) throws InterruptedException {
+        for (int i = 0; i < 50 && sentMails.size() < n; i++) Thread.sleep(50);
+        assertEquals(n, sentMails.size(), sentMails.toString());
     }
 
     @Test

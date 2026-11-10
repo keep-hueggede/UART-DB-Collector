@@ -43,6 +43,10 @@ public class UserAccount {
     @Column(name = "CreatedAt")
     private Date createdAt;
 
+    // set by the repository when the login created this account
+    @Transient
+    private boolean newAccount;
+
     public enum Role { ADMIN, USER }
 
     public UserAccount() {}
@@ -67,6 +71,8 @@ public class UserAccount {
     public Role getRole() { return role == null ? Role.USER : role; }
     public void setRole(Role role) { this.role = role; }
     public boolean isAdmin() { return getRole() == Role.ADMIN; }
+    public boolean isNewAccount() { return newAccount; }
+    public void setNewAccount(boolean newAccount) { this.newAccount = newAccount; }
     public Date getLastLoginAt() { return lastLoginAt; }
     public void setLastLoginAt(Date lastLoginAt) { this.lastLoginAt = lastLoginAt; }
 }

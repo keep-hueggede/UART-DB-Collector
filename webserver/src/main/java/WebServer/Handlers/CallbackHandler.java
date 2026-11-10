@@ -2,6 +2,7 @@ package WebServer.Handlers;
 
 import Model.UserAccount;
 import Repository.Repositories;
+import WebServer.AdminNotifier;
 import WebServer.GoogleAuth;
 import WebServer.Http.Handler;
 import WebServer.Http.HttpCall;
@@ -24,15 +25,17 @@ public class CallbackHandler implements Handler {
     private final Repositories repos;
     private final SessionManager sessions;
     private final SetupService setup;
+    private final AdminNotifier notifier;
     private final boolean secureCookie;
 
     public CallbackHandler(GoogleAuth google, OAuthStateStore states, Repositories repos,
-                           SessionManager sessions, SetupService setup, boolean secureCookie) {
+                           SessionManager sessions, SetupService setup, AdminNotifier notifier, boolean secureCookie) {
         this.google = google;
         this.states = states;
         this.repos = repos;
         this.sessions = sessions;
         this.setup = setup;
+        this.notifier = notifier;
         this.secureCookie = secureCookie;
     }
 
@@ -65,7 +68,11 @@ public class CallbackHandler implements Handler {
             GoogleAuth.GoogleUser gu = google.exchangeCode(code, redirectUri);
             UserAccount user = repos.users().loginOrCreate(gu.sub, gu.email, gu.name, gu.pictureUrl);
             // first-run setup: the account that proved the setup code becomes the first admin
-            if (setup.isRequired()) {
+            boolean firstRun = setup.isRequired();
+            if (user.isNewAccount() && !firstRun) {
+                notifier.newAccount(user, redirectUri.substring(0, redirectUri.length() - "/auth/callback".length()));
+            }
+            if (firstRun) {
                 String claim = SessionManager.extractCookie(cookies == null ? "" : cookies, SetupService.CLAIM_COOKIE);
                 if (setup.completeIfClaimed(claim, user.getId())) {
                     System.out.println("Einrichtung abgeschlossen: erster Admin ist " + gu.email);

@@ -33,6 +33,7 @@ public class UserRepository {
             if (user == null) {
                 user = new UserAccount(sub, email, name, pictureUrl);
                 user.setRole(UserAccount.Role.USER);
+                user.setNewAccount(true);
                 session.persist(user);
             } else {
                 user.setEmail(email);
@@ -47,6 +48,14 @@ public class UserRepository {
     public long adminCount() {
         return mapper.readInSession(session -> session.createQuery(ADMIN_COUNT, Long.class)
                 .setParameter("admin", UserAccount.Role.ADMIN).getSingleResult());
+    }
+
+    /** Mail addresses of all admins (notification recipients). */
+    public List<String> adminEmails() {
+        return mapper.readInSession(session -> session.createQuery(
+                        "SELECT u.email FROM UserAccount u WHERE u.role = :admin AND u.email IS NOT NULL AND u.email <> ''",
+                        String.class)
+                .setParameter("admin", UserAccount.Role.ADMIN).getResultList());
     }
 
     public boolean isAdmin(int userId) {
