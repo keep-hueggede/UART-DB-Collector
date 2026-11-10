@@ -58,6 +58,7 @@ const SENSOR_ICONS = {
   PRESSURE:    '<svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8zm.5-13.5V14l4.5 2.6-.8 1.4L11 15V6.5z" fill="currentColor"/></svg>',
   HUMIDITY:    '<svg viewBox="0 0 24 24"><path d="M12 2.7S5 10.1 5 14.6a7 7 0 0 0 14 0C19 10.1 12 2.7 12 2.7z" fill="currentColor"/></svg>',
   WIND:        '<svg viewBox="0 0 24 24"><path d="M3 8h10.2a3 3 0 1 0-2.8-4H3zm0 8h13.2a3 3 0 1 1-2.8 4H3zm0-4h7.2A3 3 0 1 1 7.4 16H3z" fill="currentColor"/></svg>',
+  WIND_GUST:   '<svg viewBox="0 0 24 24"><path d="M3 8h10.2a3 3 0 1 0-2.8-4H3zm0 8h13.2a3 3 0 1 1-2.8 4H3z" fill="currentColor"/><path d="M19 3l-2 5h3l-3 6" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   WIND_DIRECTION: '<svg viewBox="0 0 24 24"><path d="M12 2 6.5 20 12 16.5 17.5 20z" fill="currentColor"/></svg>',
   RAIN:        '<svg viewBox="0 0 24 24"><path d="M17.5 11a4.5 4.5 0 0 0-8.6-1.7A3.5 3.5 0 0 0 6 16h11a3 3 0 0 0 .5-5zM8 18l-1 3m4-3-1 3m4-3-1 3" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>',
   ALTITUDE:    '<svg viewBox="0 0 24 24"><path d="M14 6 8.5 15H12l-2 5 7.5-10H14z" fill="currentColor"/><path d="M3 19h18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
@@ -72,7 +73,7 @@ function sensorIcon(type) {
 function sensorLabel(type) {
   const labels = {
     TEMPERATURE: "Temperatur", PRESSURE: "Luftdruck", HUMIDITY: "Luftfeuchte",
-    WIND: "Wind", WIND_DIRECTION: "Windrichtung", RAIN: "Regen", ALTITUDE: "Höhe", VOLTAGE: "Spannung", CUSTOM: "Sensor",
+    WIND: "Wind", WIND_GUST: "Böen", WIND_DIRECTION: "Windrichtung", RAIN: "Regen", ALTITUDE: "Höhe", VOLTAGE: "Spannung", CUSTOM: "Sensor",
   };
   return labels[type] || type || "Sensor";
 }
