@@ -59,6 +59,7 @@ public class Sensor {
         RAIN("mm"),
         ALTITUDE("m"),
         VOLTAGE("V"),
+        BATTERY_LOW(""),   // 1 = battery of the device (e.g. radio wind sender) is low
         CUSTOM("");
 
         private final String defaultUnit;

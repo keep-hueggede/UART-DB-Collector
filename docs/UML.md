@@ -90,6 +90,7 @@ classDiagram
         RAIN
         ALTITUDE
         VOLTAGE
+        BATTERY_LOW
         CUSTOM
     }
     class DeviceType {
