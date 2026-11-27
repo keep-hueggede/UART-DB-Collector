@@ -23,6 +23,30 @@ public class MeasurementRepository {
         return Math.round(v * 1000.0) / 1000.0;
     }
 
+    /** Battery flag of one sensor: latest value low, and whether any low value came in since a given time. */
+    public record BatteryState(int sensorId, int deviceId, String deviceName, boolean low, boolean lowSince) {}
+
+    /** All BATTERY_LOW sensors with a reading (not user-scoped; for notifications). */
+    public List<BatteryState> batteryStates(Date since) {
+        return mapper.readInSession(session -> {
+            List<BatteryState> out = new ArrayList<>();
+            List<Sensor> sensors = session.createQuery("FROM Sensor s JOIN FETCH s.device WHERE s.sensorType = :t",
+                    Sensor.class).setParameter("t", Sensor.SensorType.BATTERY_LOW).getResultList();
+            for (Sensor s : sensors) {
+                Double latest = session.createQuery("SELECT m.value FROM Measurement m WHERE m.sensor.id = :sid "
+                                + "ORDER BY m.timestamp DESC, m.id DESC", Double.class)
+                        .setParameter("sid", s.getId()).setMaxResults(1).uniqueResult();
+                if (latest == null) continue;
+                long lowCount = session.createQuery("SELECT COUNT(m) FROM Measurement m WHERE m.sensor.id = :sid "
+                                + "AND m.value >= 0.5 AND m.timestamp >= :since", Long.class)
+                        .setParameter("sid", s.getId()).setParameter("since", since).getSingleResult();
+                out.add(new BatteryState(s.getId(), s.getDevice().getId(), s.getDevice().getName(),
+                        latest >= 0.5, lowCount > 0));
+            }
+            return out;
+        });
+    }
+
     /** Latest measurement per owned sensor, including sensor + device metadata. */
     public List<Map<String, Object>> latest(Viewer viewer) {
         return mapper.readInSession(session -> {

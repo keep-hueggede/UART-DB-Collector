@@ -58,6 +58,14 @@ public class UserRepository {
                 .setParameter("admin", UserAccount.Role.ADMIN).getResultList());
     }
 
+    /** Mail addresses of the users a device is assigned to. */
+    public List<String> emailsForDevice(int deviceId) {
+        return mapper.readInSession(session -> session.createQuery(
+                        "SELECT DISTINCT ud.user.email FROM UserDevice ud WHERE ud.device.id = :d "
+                                + "AND ud.user.email IS NOT NULL AND ud.user.email <> ''", String.class)
+                .setParameter("d", deviceId).getResultList());
+    }
+
     public boolean isAdmin(int userId) {
         return mapper.readInSession(session -> {
             UserAccount u = session.get(UserAccount.class, userId);

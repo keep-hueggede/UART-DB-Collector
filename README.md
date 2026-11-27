@@ -264,6 +264,7 @@ ohne Admin die Einrichtung erneut.
 | Andere zu Administratoren machen | – | ja (der letzte Admin kann nicht entzogen werden) |
 | Google-Login, Sitzungsdauer, E-Mail-Versand aendern | – | ja (*Administration -> Server*) |
 | E-Mail bei neuen Konten | – | ja (alle Admins) |
+| E-Mail bei schwacher Batterie | ja (zugewiesene Geraete) | ja (zugewiesene Geraete) |
 
 Neue Google-Konten werden beim ersten Login als Benutzer ohne Geraete angelegt.
 Rollenaenderungen gelten sofort, auch fuer bestehende Sitzungen.
@@ -285,6 +286,12 @@ Meldet sich ein Google-Konto zum ersten Mal an, erhalten **alle Administratoren*
 eine E-Mail mit Name, Adresse und Zeitpunkt; die Freigabe erfolgt dann unter
 *Administration -> Benutzer*. Der Versand laeuft im Hintergrund, ein Fehler
 blockiert den Login nicht und steht nur im Server-Log.
+
+Meldet ein Geraet eine schwache Batterie (Sensortyp `BATTERY_LOW`, z. B.
+`windbatlow` vom Funk-Windsender), erhalten **alle Benutzer, denen das Geraet
+zugewiesen ist**, eine E-Mail. Der Web-Server prueft alle 10 Minuten; eine
+weitere Mail gibt es erst, nachdem die Batterie einen ganzen Tag lang "ok"
+gemeldet hat.
 
 SMTP wird unter *Administration -> Server* eingetragen (oder einmalig per
 `MAIL.*` in `app.config`). Voreingestellt ist **Strato**: `smtp.strato.de`,

@@ -42,6 +42,7 @@ public class WebServer {
     private final Router api;
     private final Router auth;
     private final StaticFileHandler staticFiles;
+    private final BatteryWatcher batteries;
 
     private HttpServer server;
 
@@ -84,6 +85,7 @@ public class WebServer {
                 .post("/auth/logout", new LogoutHandler(sessions, secureCookie));
 
         this.staticFiles = new StaticFileHandler(webRoot);
+        this.batteries = new BatteryWatcher(repos.measurements(), repos.users(), repos.settings(), settings::mailer);
     }
 
     public void start() throws IOException {
@@ -93,9 +95,11 @@ public class WebServer {
         this.server.createContext("/", this::onStatic);
         this.server.setExecutor(Executors.newFixedThreadPool(4));
         this.server.start();
+        this.batteries.start();
     }
 
     public void stop() {
+        this.batteries.stop();
         if (this.server != null) this.server.stop(0);
     }
 
