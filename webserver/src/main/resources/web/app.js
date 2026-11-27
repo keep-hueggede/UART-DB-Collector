@@ -76,6 +76,17 @@ function batteryText(v) {
   return v == null ? "–" : Number(v) >= 0.5 ? "schwach" : "ok";
 }
 
+const BATTERY_OK_ICON = '<svg viewBox="0 0 24 24"><rect x="3" y="7" width="16" height="10" rx="2" stroke="currentColor" stroke-width="1.6" fill="none"/><path d="M21 10v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><rect x="5" y="9" width="12" height="6" fill="currentColor"/></svg>';
+
+// Battery flag of a device's radio sender, shown in the device card instead of as a sensor
+function batteryTag(m) {
+  if (!m || m.value == null) return "";
+  const low = Number(m.value) >= 0.5;
+  const title = `Batterie des Funksenders ${low ? "schwach" : "ok"} · gemeldet ${fmtAge(m.timestamp)}`;
+  return `<span class="battery-tag ${low ? "low" : "ok"}" title="${escapeHtml(title)}">`
+    + `${low ? SENSOR_ICONS.BATTERY_LOW : BATTERY_OK_ICON}${low ? "Batterie schwach" : "Batterie ok"}</span>`;
+}
+
 function sensorLabel(type) {
   const labels = {
     TEMPERATURE: "Temperatur", PRESSURE: "Luftdruck", HUMIDITY: "Luftfeuchte",
@@ -397,13 +408,17 @@ async function loadDashboard() {
     api("/api/measurements/latest"),
   ]);
   state.sensors = sensors;
-  renderDevices(devices);
-  renderSensors(sensors, latest);
+  const byId = new Map(latest.map(m => [m.sensorId, m]));
+  const battery = new Map(sensors.filter(s => s.sensorType === "BATTERY_LOW")
+    .map(s => [s.deviceId, byId.get(s.id)]));
+  const shown = sensors.filter(s => s.sensorType !== "BATTERY_LOW");
+  renderDevices(devices, battery);
+  renderSensors(shown, latest);
   const pending = state.me && !state.me.approved && devices.length === 0;
   $("pending-hint").classList.toggle("hidden", !pending);
-  $("empty-hint").classList.toggle("hidden", pending || sensors.length > 0);
+  $("empty-hint").classList.toggle("hidden", pending || shown.length > 0);
   $("devices-head").classList.toggle("hidden", pending);
-  $("sensors-title").classList.toggle("hidden", sensors.length === 0);
+  $("sensors-title").classList.toggle("hidden", shown.length === 0);
   const latestTs = latest.map(m => m.timestamp).filter(Boolean).sort((a, b) => b - a)[0];
   const line = $("status-line");
   line.className = "status-line ok";
@@ -411,7 +426,7 @@ async function loadDashboard() {
     ? `Letzter Wert ${fmtAge(latestTs)}`
     : `${sensors.length} Sensor${sensors.length === 1 ? "" : "en"} · keine eigenen Daten`;
 
-  await Promise.all(sensors.map(async s => {
+  await Promise.all(shown.map(async s => {
     try {
       const data = await api(`/api/measurements?sensorId=${s.id}&window=86400000&limit=500`);
       const slot = document.querySelector(`.sensor-card[data-id="${s.id}"] .sensor-spark-slot`);
@@ -428,16 +443,19 @@ async function loadDashboard() {
 
 const PENCIL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
 
-function renderDevices(devices) {
+function renderDevices(devices, battery) {
   const root = $("devices");
   root.innerHTML = "";
   for (const d of devices) {
-    const card = el("div", "device-card");
+    const bat = battery.get(d.id);
+    const count = (d.sensorCount || 0) - (battery.has(d.id) ? 1 : 0);
+    const card = el("div", "device-card" + (bat && Number(bat.value) >= 0.5 ? " battery-low" : ""));
     card.innerHTML = `
       <span class="device-dot ${d.online ? "on" : ""}"></span>
       <div>
         <h3>${escapeHtml(d.name || "–")}</h3>
-        <p>${escapeHtml(d.deviceType || "SENSOR")} · ${d.sensorCount || 0} Sensor${d.sensorCount === 1 ? "" : "en"}${d.firmware ? " · Firmware " + escapeHtml(d.firmware) : ""}</p>
+        <p>${escapeHtml(d.deviceType || "SENSOR")} · ${count} Sensor${count === 1 ? "" : "en"}${d.firmware ? " · Firmware " + escapeHtml(d.firmware) : ""}</p>
+        ${batteryTag(bat)}
       </div>
       <div class="device-meta">${d.lastSeen ? fmtAge(d.lastSeen) : ""}</div>
       <button class="icon-btn device-edit admin-only" aria-label="Umbenennen">${PENCIL_ICON}</button>`;
