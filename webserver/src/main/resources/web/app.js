@@ -63,6 +63,7 @@ const SENSOR_ICONS = {
   RAIN:        '<svg viewBox="0 0 24 24"><path d="M17.5 11a4.5 4.5 0 0 0-8.6-1.7A3.5 3.5 0 0 0 6 16h11a3 3 0 0 0 .5-5zM8 18l-1 3m4-3-1 3m4-3-1 3" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>',
   ALTITUDE:    '<svg viewBox="0 0 24 24"><path d="M14 6 8.5 15H12l-2 5 7.5-10H14z" fill="currentColor"/><path d="M3 19h18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
   VOLTAGE:     '<svg viewBox="0 0 24 24"><path d="M13 2 4 14h6l-1 8 9-12h-6z" fill="currentColor"/></svg>',
+  BATTERY_LOW: '<svg viewBox="0 0 24 24"><rect x="3" y="7" width="16" height="10" rx="2" stroke="currentColor" stroke-width="1.6" fill="none"/><path d="M21 10v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><rect x="5" y="9" width="4" height="6" fill="currentColor"/></svg>',
   CUSTOM:      '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="currentColor"/></svg>',
 };
 
@@ -70,10 +71,15 @@ function sensorIcon(type) {
   return SENSOR_ICONS[type] || SENSOR_ICONS.CUSTOM;
 }
 
+// BATTERY_LOW is a flag (1 = low), shown as text instead of a number
+function batteryText(v) {
+  return v == null ? "–" : Number(v) >= 0.5 ? "schwach" : "ok";
+}
+
 function sensorLabel(type) {
   const labels = {
     TEMPERATURE: "Temperatur", PRESSURE: "Luftdruck", HUMIDITY: "Luftfeuchte",
-    WIND: "Wind", WIND_GUST: "Böen", WIND_DIRECTION: "Windrichtung", RAIN: "Regen", ALTITUDE: "Höhe", VOLTAGE: "Spannung", CUSTOM: "Sensor",
+    WIND: "Wind", WIND_GUST: "Böen", WIND_DIRECTION: "Windrichtung", RAIN: "Regen", ALTITUDE: "Höhe", VOLTAGE: "Spannung", BATTERY_LOW: "Batterie", CUSTOM: "Sensor",
   };
   return labels[type] || type || "Sensor";
 }
@@ -456,7 +462,7 @@ function renderSensors(sensors, latest) {
         <span class="sensor-icon">${sensorIcon(s.sensorType)}</span>
         <span class="sensor-name" title="${escapeHtml(s.deviceName)}">${escapeHtml(s.deviceName)} · ${escapeHtml(sensorLabel(s.sensorType))}</span>
       </div>
-      <div class="sensor-value">${fmtValue(m.value, s.sensorType === "WIND_DIRECTION" ? 0 : undefined)}<span class="unit">${escapeHtml(s.unit || "")}${s.sensorType === "WIND_DIRECTION" ? " " + compass(m.value) : ""}</span></div>
+      <div class="sensor-value">${s.sensorType === "BATTERY_LOW" ? batteryText(m.value) : fmtValue(m.value, s.sensorType === "WIND_DIRECTION" ? 0 : undefined)}<span class="unit">${escapeHtml(s.unit || "")}${s.sensorType === "WIND_DIRECTION" ? " " + compass(m.value) : ""}</span></div>
       <div class="sensor-spark-slot"></div>
       <div class="sensor-time">${m.timestamp ? fmtAge(m.timestamp) : "keine Daten"}</div>`;
     card.addEventListener("click", () => openDetail(s.id));
@@ -495,7 +501,9 @@ async function loadDetail() {
   const last = pts.length ? pts[pts.length - 1] : null;
   const isRain = data.sensor?.sensorType === "RAIN";
   const isDir = data.sensor?.sensorType === "WIND_DIRECTION";
-  $("detail-current").textContent = isRain ? fmtValue(data.stats?.sum ?? 0) : (last ? fmtValue(Number(last.v)) : "–");
+  const isBattery = data.sensor?.sensorType === "BATTERY_LOW";
+  $("detail-current").textContent = isRain ? fmtValue(data.stats?.sum ?? 0)
+    : isBattery ? batteryText(last?.v) : (last ? fmtValue(Number(last.v)) : "–");
   $("detail-unit").textContent = isRain ? `${unit} im Zeitraum` : isDir && last ? `${unit} ${compass(last.v)}` : unit;
   renderBigChart($("chart"), pts, unit);
   $("stat-min").textContent = fmtValue(data.stats?.min);
